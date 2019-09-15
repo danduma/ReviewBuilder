@@ -1,0 +1,4 @@
+scholarly
+tqdm
+bibtexparser
+requests
