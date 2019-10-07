@@ -1,34 +1,46 @@
 import requests
 import scholarly
 from time import sleep
-from .base_search import Searcher, MAX_RESULTS
+from .base_search import Searcher, MAX_RESULTS, SearchResult
 import bibtexparser
 from tqdm import tqdm
 from random import random
+from references.bibtex import fix_bib_data
 
 
 class GScholarSearcher(Searcher):
     """
     Retrieves results and bibtex data from Google Scholar
     """
-    def randomSleep(self):
-        sleep(0.1 + random() / 10)  # random sleep so we don't get blocked
 
-    def search(self, query, max_results=MAX_RESULTS):
+    def __init__(self, paperstore):
+        super().__init__(paperstore)
+        self.min_delay_between_requests = 0.1
+
+    def randomSleep(self):
+        sleep(self.min_delay_between_requests + random() / 10)  # random sleep so we don't get blocked
+
+    def search(self, query, min_year=None, max_year=None, max_results=MAX_RESULTS):
+        # TODO implement max year
+        if min_year:
+            scholarly.scholarly._PUBSEARCH = '/scholar?as_ylo=' + str(min_year) + '&q={0}'
+
         query = scholarly.search_pubs_query(query)
         results = []
+        index = 0
         for result in tqdm(query, desc="Getting results", total=max_results):
-            bib = result.bib
+            bib = fix_bib_data(result.bib, index)
 
-            result_dict = {"bib": bib,
-                           "citedby": result.citedby,
-                           "url": result.url_scholarbib,
-                           "id_scholarcitedby": result.id_scholarcitedby,
-                           "source": result.source,
-                           "url_scholarbib": result.url_scholarbib
-                           }
+            extra_data = {}
 
-            results.append(result_dict)
+            for field in ['citedby', 'id_scholarcitedby', 'url_scholarbib', 'url']:
+                if hasattr(result, field):
+                    extra_data[field] = getattr(result, field)
+
+            result = SearchResult(index, bib, result.source, extra_data)
+            results.append(result)
+            index += 1
+
             if len(results) == max_results:
                 break
 

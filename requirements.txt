@@ -2,3 +2,4 @@ scholarly
 tqdm
 bibtexparser
 requests
+strsimpy
