@@ -2,21 +2,38 @@ import bibtexparser
 import re
 
 
-def convert_result(result, index):
-    bib = result["bib"]
+def fix_bib_data(bib, index):
+    """
+    Add mandatory missing fields to bibtex data
+
+    :param bib:
+    :param index:
+    :return:
+    """
     if "ENTRYTYPE" not in bib:
         bib["ENTRYTYPE"] = "ARTICLE"
     if "ID" not in bib:
         # if 'author' in bib:
         bib["ID"] = "id" + str(index)
 
-    return result["bib"]
+    return bib
 
 
-def write_bibtex(results, filename):
+def dict_from_string(bibstr):
+    return bibtexparser.loads(bibstr).entries
+
+
+def write_bibtex(results:list, filename:str):
+    """
+    Exports the list of results to a BibTeX file.
+
+    :param results: a list of either SearchResult or Paper objects, with a .bib dict property
+    :param filename: file to export the bibtex to
+    """
     db = bibtexparser.bibdatabase.BibDatabase()
+
     for index, result in enumerate(results):
-        db.entries.append(convert_result(result, index))
+        db.entries.append(fix_bib_data(result.bib, index))
 
     with open(filename, 'w') as bibtex_file:
         bibtexparser.dump(db, bibtex_file)
