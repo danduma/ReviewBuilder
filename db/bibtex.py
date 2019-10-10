@@ -13,17 +13,49 @@ def fix_bib_data(bib, index):
     if "ENTRYTYPE" not in bib:
         bib["ENTRYTYPE"] = "ARTICLE"
     if "ID" not in bib:
-        # if 'author' in bib:
-        bib["ID"] = "id" + str(index)
-
+        authors = parseBibAuthors(bib["author"])
+        # bib["ID"] = 'id' + str(index)
+        bib["ID"] = authors[0]["family"] + bib.get("year", "____") + bib["title"].split()[0].lower()
     return bib
 
 
-def dict_from_string(bibstr):
+def parseBibAuthors(authors):
+    bits = authors.split('and')
+    authors = []
+    for bit in bits:
+        match = re.search(r"([A-Z]+)\s+(\w+)", bit)
+        if match:
+            author = {"given": match.group(1), "family": match.group(2)}
+            authors.append(author)
+        else:
+            match = re.search(r"([A-Z]\w+)\s*,\s*([A-Z]\w*)", bit)
+            if match:
+                author = {"given": match.group(2), "family": match.group(1)}
+                authors.append(author)
+            else:
+                author = {"given": '', "family": bit}
+                # raise ValueError("Couldn't find names")
+    return authors
+
+
+def authorListFromDict(authors):
+    authorstrings = []
+    for author in authors:
+        authorstrings.append(author.get('given', '') + author.get('middle', '') + " " + author.get('family', ''))
+
+    authors_string = " and ".join(authorstrings)
+    return authors_string
+
+
+def read_bibtex_string(bibstr):
     return bibtexparser.loads(bibstr).entries
 
 
-def write_bibtex(results:list, filename:str):
+def read_bibtex_file(filename):
+    return bibtexparser.load(open(filename, 'r')).entries
+
+
+def write_bibtex(results: list, filename: str):
     """
     Exports the list of results to a BibTeX file.
 
