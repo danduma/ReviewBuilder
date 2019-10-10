@@ -5,7 +5,7 @@ from .base_search import Searcher, MAX_RESULTS, SearchResult
 import bibtexparser
 from tqdm import tqdm
 from random import random
-from references.bibtex import fix_bib_data
+from db.bibtex import fix_bib_data
 
 
 class GScholarSearcher(Searcher):
