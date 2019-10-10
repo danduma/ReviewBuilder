@@ -1,9 +1,10 @@
 import sqlite3
-import os
-import re
-from os.path import exists
+import os, re, json
 import pandas as pd
 import bibtexparser
+import unicodedata
+
+from db.bibtex import parseBibAuthors
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -21,11 +22,19 @@ CACHE_FILE = os.path.join(current_dir, "papers.sqlite")
 #     pmid = Column(String, unique=True)
 #     scholarid = Column(String, unique=True)
 
+def unicodeToASCII(input_str):
+    nfkd_form = unicodedata.normalize('NFKD', input_str)
+    only_ascii = nfkd_form.encode('ASCII', 'ignore').decode("utf-8")
+    return only_ascii
+
+
 def normalizeTitle(title):
     """
         Returns a "normalized" title for easy matching
     """
     title = title.lower()
+    title = re.sub(r"–", " ", title)
+    title = unicodeToASCII(title)
     title = title.replace("-  ", "").replace("- ", "")
     title = re.sub(r"[\"\#\$\%\&\\\'\(\)\*\+\,\-\.\/\:\;\<\=\>\?\¿\!\¡\@\[\]\^\_\`\{\|\}\~]", " ", title)
     title = re.sub(r"\s+", " ", title)
@@ -34,13 +43,59 @@ def normalizeTitle(title):
     return title
 
 
+def generateUniqueID(paper):
+    """
+    Returns a simple string id that is the mashup of the title and authors
+
+    :param paper:
+    :return:
+    """
+    author_bit = ''
+    if paper.extra_data.get('xref_author'):
+        authors = paper.extra_data['xref_author']
+    else:
+        try:
+            authors = parseBibAuthors(paper.authors)
+        except:
+            print("Failed to parse authors string", paper.authors)
+            authors = [{'given':'', 'family':''}]
+
+    for author in authors:
+        if author.get('family'):
+            author_bit += author.get('family', '_')[0] + author.get('given', '_')[0]
+
+    title_bit = normalizeTitle(paper.title)
+    title_bit = re.sub("\s+", "", title_bit)
+    full_id = title_bit + "_" + author_bit
+    full_id = full_id.lower()
+    return full_id
+
+
 class Paper:
-    def __init__(self, bib:dict=None, extra_data:dict=None, pmid=None, scholarid=None, arxivid=None):
+    def __init__(self, bib: dict = None, extra_data: dict = None, pmid=None, scholarid=None, arxivid=None):
         self.bib = bib
         self.extra_data = extra_data
         self.pmid = pmid
         self.scholarid = scholarid
         self.arxivid = arxivid
+
+        for field in bib:
+            if bib[field] is None:
+                bib[field] = ''
+
+    @classmethod
+    def fromRecord(cls, paper_record):
+        res = Paper(json.loads(paper_record["bib"]),
+                    json.loads(paper_record["extra_data"]),
+                    pmid=paper_record["pmid"],
+                    scholarid=paper_record["scholarid"],
+                    arxivid=paper_record["arxivid"],
+                    )
+        return res
+
+    @property
+    def id(self):
+        return generateUniqueID(self)
 
     @property
     def doi(self):
@@ -96,18 +151,26 @@ class Paper:
             return ""
 
     def asDict(self):
-        return {"title": self.title,
-                "norm_title": self.norm_title,
-                "authors": self.authors,
-                "year": self.year,
-                "venue": self.venue,
-                "bib": str(self.bib),
-                "doi": self.doi,
-                "arxivid": self.arxivid,
-                "scholarid": self.scholarid,
-                "pmid": self.pmid,
-                "extra_data": str(self.extra_data)
-                }
+        return {
+            "id": self.id,
+            "title": self.title,
+            "norm_title": self.norm_title,
+            "authors": self.authors,
+            "year": self.year,
+            "venue": self.venue,
+            "bib": json.dumps(self.bib),
+            "doi": self.doi,
+            "arxivid": self.arxivid,
+            "scholarid": self.scholarid,
+            "pmid": self.pmid,
+            "extra_data": json.dumps(self.extra_data)
+        }
+
+    def __repr__(self):
+        return f"<%s - %s - %s> \n %s" % (
+            self.bib.get("title", ""),
+            self.bib.get("author", ""),
+            self.bib.get("year", ""), str(self.bib))
 
 
 class PaperStore:
@@ -118,6 +181,7 @@ class PaperStore:
 
     def initaliseDB(self):
         self.conn.execute("""CREATE TABLE IF NOT EXISTS "papers" (
+                         "id" text primary key,
                          "doi" text unique,
                          "pmid" text unique,
                          "scholarid" text unique,
@@ -133,7 +197,15 @@ class PaperStore:
          """)
 
         self.conn.execute(
-            """CREATE INDEX IF NOT EXISTS idx_papers ON papers(doi, pmid, scholarid, arxivid, title, norm_title)""")
+            """CREATE UNIQUE INDEX IF NOT EXISTS idx_papers_ids ON papers(id, doi)""")
+
+        self.conn.execute(
+            """CREATE INDEX IF NOT EXISTS idx_papers_otherids ON papers(pmid, scholarid, arxivid)""")
+
+        self.conn.execute(
+            """CREATE INDEX IF NOT EXISTS idx_papers_title ON papers(title, norm_title)""")
+
+        self.conn.commit()
 
     # def runSelectStatement(self, sql, parameters):
     #     """
@@ -160,11 +232,7 @@ class PaperStore:
         if not paper_record:
             return None
 
-        res = Paper(paper_record["bib"], paper_record["extra_data"],
-                    pmid=paper_record["pmid"],
-                    scholarid=paper_record["scholarid"],
-                    arxivid=paper_record["arxivid"],
-                    )
+        res = Paper.fromRecord(paper_record)
         return res
 
     def findPapersByTitle(self, title):
@@ -184,11 +252,7 @@ class PaperStore:
 
         res = []
         for paper_record in paper_records:
-            res.append(Paper(paper_record["bib"], paper_record["extra_data"],
-                             pmid=paper_record["pmid"],
-                             scholarid=paper_record["scholarid"],
-                             arxivid=paper_record["arxivid"],
-                             ))
+            res.append(Paper.fromRecord(paper_record))
         return res
 
     def addPaper(self, paper: Paper):
@@ -202,14 +266,14 @@ class PaperStore:
 
     def updatePapers(self, papers: list):
         for paper in papers:
-            c = self.conn.cursor()
-            c.execute(
-                """REPLACE INTO papers (doi, pmid, scholarid, arxivid, authors, year, title, norm_title, venue, bib, extra_data) values (?,?,?,?,?,?,?,?,?,?,?)""",
-                (paper.doi, paper.pmid, paper.scholarid, paper.arxivid,
-                 paper.authors, paper.year, paper.title,
-                 paper.norm_title, paper.venue,
-                 str(paper.bib), str(paper.extra_data)))
-            c.close()
+            values = paper.asDict()
+            self.conn.execute(
+                """REPLACE INTO papers (id, doi, pmid, scholarid, arxivid, authors, year, title, norm_title, venue, bib, extra_data) values (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (values['id'], values['doi'], values['pmid'], values['scholarid'],
+                 values['arxivid'], values['authors'], values['year'],
+                 values['title'], values['norm_title'], values['venue'],
+                 values['bib'], values['extra_data']))
+            self.conn.commit()
 
     def matchResultsWithPapers(self, results):
         """
@@ -247,7 +311,7 @@ class PaperStore:
         return found, missing
 
 
-def test():
+def test1():
     bibstr = """@ARTICLE{Cesar2013,
       author = {Jean César},
       title = {An amazing title},
@@ -267,5 +331,12 @@ def test():
     paperstore.addPapers([paper])
 
 
+def test2():
+    paperstore = PaperStore()
+    paper = paperstore.getPaper('10.1148/radiol.2018171093')
+    paper.arxivid = None
+    paperstore.updatePapers([paper])
+
+
 if __name__ == '__main__':
-    test()
+    test2()
