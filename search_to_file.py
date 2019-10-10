@@ -1,8 +1,8 @@
 from db.data import PaperStore, Paper
 
-from search import GScholarSearcher, enrichMetadata
+from search import GScholarSearcher, enrichAndUpdateMetadata
 from argparse import ArgumentParser
-from references import write_bibtex
+from db.bibtex import write_bibtex
 
 
 def main(conf):
@@ -18,17 +18,21 @@ def main(conf):
     else:
         raise ValueError
 
-    results = searcher.search(conf.query, min_year=conf.year_start, max_results=conf.max)
+    if conf.query_file:
+        with open(conf.query_file, 'r') as f:
+            query = f.read()
+            print(query)
+    else:
+        query = conf.query
+
+    results = searcher.search(query, min_year=conf.year_start, max_results=conf.max)
     found, missing = paperstore.matchResultsWithPapers(results)
 
     papers_to_add = [Paper(res.bib, res.extra_data) for res in missing]
-    enrichMetadata(papers_to_add)
+    enrichAndUpdateMetadata(papers_to_add, paperstore)
 
-    paperstore.addPapers(papers_to_add)
-
-    papers_existing = [Paper(res.bib, res.extra_data) for res in found]
-    enrichMetadata(papers_existing)
-    paperstore.updatePapers(papers_existing)
+    papers_existing = [res.paper for res in found]
+    # enrichAndUpdateMetadata(papers_existing)
 
     all_papers = papers_to_add + papers_existing
     write_bibtex(all_papers, conf.file)
@@ -39,6 +43,8 @@ if __name__ == '__main__':
 
     parser.add_argument('-q', '--query', type=str,
                         help='The query to use to retrieve the articles')
+    parser.add_argument('-qf', '--query-file', type=str,
+                        help='Text file containing the query to use to retrieve the articles')
     parser.add_argument('-ys', '--year-start', type=int,
                         help='The minimum year for results')
     parser.add_argument('-ye', '--year-end', type=int,
