@@ -2,7 +2,7 @@ import bibtexparser
 import re
 
 
-def fix_bib_data(bib, index):
+def fixBibData(bib, index):
     """
     Add mandatory missing fields to bibtex data
 
@@ -16,7 +16,20 @@ def fix_bib_data(bib, index):
         authors = parseBibAuthors(bib["author"])
         # bib["ID"] = 'id' + str(index)
         bib["ID"] = authors[0]["family"] + bib.get("year", "____") + bib["title"].split()[0].lower()
+        # if not bib.get("year"):
+        #     assert False
+
     return bib
+
+
+def getDOIfromURL(url):
+    if not url:
+        return None
+
+    match = re.search('(10\.\d+\/[a-zA-Z\.\d]+)\/?', url)
+    if match:
+        return match.group(1)
+    return None
 
 
 def parseBibAuthors(authors):
@@ -41,13 +54,17 @@ def parseBibAuthors(authors):
 def authorListFromDict(authors):
     authorstrings = []
     for author in authors:
-        authorstrings.append(author.get('given', '') + author.get('middle', '') + " " + author.get('family', ''))
+        authorstring = author.get('family', '')
+        if author.get('middle', ''):
+            authorstring += ' ' + author.get('middle')
+        authorstring += ', ' + author.get('given', '')
+        authorstrings.append(authorstring)
 
     authors_string = " and ".join(authorstrings)
     return authors_string
 
 
-def read_bibtex_string(bibstr):
+def readBibtexString(bibstr):
     return bibtexparser.loads(bibstr).entries
 
 
@@ -65,7 +82,7 @@ def write_bibtex(results: list, filename: str):
     db = bibtexparser.bibdatabase.BibDatabase()
 
     for index, result in enumerate(results):
-        db.entries.append(fix_bib_data(result.bib, index))
+        db.entries.append(fixBibData(result.bib, index))
 
     with open(filename, 'w') as bibtex_file:
         bibtexparser.dump(db, bibtex_file)
