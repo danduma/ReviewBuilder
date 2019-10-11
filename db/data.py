@@ -150,6 +150,13 @@ class Paper:
         elif entrytype in ["misc", "unpublished"]:
             return ""
 
+    @property
+    def has_pdf(self):
+        for url in self.extra_data.get('urls',[]):
+            if url['type'] == 'pdf':
+                return True
+        return False
+
     def asDict(self):
         return {
             "id": self.id,
