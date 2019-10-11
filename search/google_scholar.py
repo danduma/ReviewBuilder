@@ -5,7 +5,7 @@ from .base_search import Searcher, MAX_RESULTS, SearchResult
 import bibtexparser
 from tqdm import tqdm
 from random import random
-from db.bibtex import fix_bib_data
+from db.bibtex import fixBibData, getDOIfromURL
 
 
 class GScholarSearcher(Searcher):
@@ -29,13 +29,20 @@ class GScholarSearcher(Searcher):
         results = []
         index = 0
         for result in tqdm(query, desc="Getting results", total=max_results):
-            bib = fix_bib_data(result.bib, index)
+            bib = fixBibData(result.bib, index)
 
             extra_data = {}
 
             for field in ['citedby', 'id_scholarcitedby', 'url_scholarbib', 'url']:
                 if hasattr(result, field):
                     extra_data[field] = getattr(result, field)
+
+            doi = getDOIfromURL(bib.get('url'))
+            if not doi:
+                doi = getDOIfromURL(bib.get('eprint'))
+
+            if doi:
+                bib['doi'] = doi
 
             result = SearchResult(index, bib, result.source, extra_data)
             results.append(result)
