@@ -29,7 +29,7 @@ def main(conf):
     found, missing = paperstore.matchResultsWithPapers(results)
 
     papers_to_add = [Paper(res.bib, res.extra_data) for res in missing]
-    enrichAndUpdateMetadata(papers_to_add, paperstore)
+    enrichAndUpdateMetadata(papers_to_add, paperstore, conf.email)
 
     papers_existing = [res.paper for res in found]
     # enrichAndUpdateMetadata(papers_existing)
@@ -55,6 +55,8 @@ if __name__ == '__main__':
                         help='Maximum number of results to retrieve')
     parser.add_argument('-e', '--engine', type=str, default="scholar",
                         help='Which search engine to use. Currently only "scholar" (Google Scholar) available ')
+    parser.add_argument('-em', '--email', type=str,
+                        help='Email to serve as identity to API endpoints')
     parser.add_argument('-c', '--cache', type=bool, default=True,
                         help='Use local cache for results')
 
