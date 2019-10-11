@@ -58,7 +58,7 @@ def generateUniqueID(paper):
             authors = parseBibAuthors(paper.authors)
         except:
             print("Failed to parse authors string", paper.authors)
-            authors = [{'given':'', 'family':''}]
+            authors = [{'given': '', 'family': ''}]
 
     for author in authors:
         if author.get('family'):
@@ -75,9 +75,7 @@ class Paper:
     def __init__(self, bib: dict = None, extra_data: dict = None, pmid=None, scholarid=None, arxivid=None):
         self.bib = bib
         self.extra_data = extra_data
-        self.pmid = pmid
         self.scholarid = scholarid
-        self.arxivid = arxivid
 
         for field in bib:
             if bib[field] is None:
@@ -104,6 +102,30 @@ class Paper:
     @doi.setter
     def doi(self, doi):
         self.bib["doi"] = doi
+
+    @property
+    def arxivid(self):
+        return self.extra_data.get("arxivid")
+
+    @arxivid.setter
+    def arxivid(self, arxivid):
+        self.extra_data["arxivid"] = arxivid
+
+    @property
+    def pmid(self):
+        return self.extra_data.get("pmid")
+
+    @pmid.setter
+    def pmid(self, pmid):
+        self.extra_data["pmid"] = pmid
+
+    @property
+    def scholarid(self):
+        return self.extra_data.get("scholarid")
+
+    @scholarid.setter
+    def scholarid(self, scholarid):
+        self.extra_data["scholarid"] = scholarid
 
     @property
     def title(self):
@@ -152,7 +174,7 @@ class Paper:
 
     @property
     def has_pdf(self):
-        for url in self.extra_data.get('urls',[]):
+        for url in self.extra_data.get('urls', []):
             if url['type'] == 'pdf':
                 return True
         return False
