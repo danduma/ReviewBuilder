@@ -1,5 +1,6 @@
 import bibtexparser
 import re
+import random
 
 
 def fixBibData(bib, index):
@@ -14,10 +15,12 @@ def fixBibData(bib, index):
         bib["ENTRYTYPE"] = "ARTICLE"
     if "ID" not in bib or bib.get('year'):
         authors = parseBibAuthors(bib["author"])
-        # bib["ID"] = 'id' + str(index)
-        bib["ID"] = authors[0]["family"] + bib.get("year", "YEAR") + bib["title"].split()[0].lower()
-        # if not bib.get("year"):
-        #     assert False
+        if not authors:
+            bib['ID'] = 'id' + str(random.randint(1000, 9000))
+        else:
+            bib["ID"] = authors[0]["family"]
+
+        bib['ID'] += bib.get("year", "YEAR") + bib["title"].split()[0].lower()
 
     return bib
 
