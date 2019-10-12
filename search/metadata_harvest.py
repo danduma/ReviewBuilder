@@ -19,16 +19,11 @@ from lxml import etree
 
 dist = NormalizedLevenshtein()
 
-BIB_FIELDS = ['address', 'annote', 'author', 'booktitle', 'chapter', 'crossref', 'doi', 'edition', 'editor',
+BIB_FIELDS = ['abstract', 'address', 'annote', 'author', 'booktitle', 'chapter',
+              'crossref', 'doi', 'edition', 'editor',
               'howpublished', 'institution', 'issue', 'journal', 'key',
               'month', 'note', 'number', 'organization',
-              'pages', 'publisher', 'school', 'series', 'title', 'type', 'volume', 'year']
-
-TRUSTED_BIB_FIELDS = ['address', 'annote', 'author', 'booktitle', 'chapter', 'crossref',
-                      'doi', 'edition', 'editor',
-                      'howpublished', 'institution', 'issue', 'journal', 'key',
-                      'month', 'note', 'number', 'organization',
-                      'pages', 'publisher', 'school', 'series', 'type', 'volume', 'year']
+              'pages', 'publisher', 'school', 'series', 'type', 'volume', 'year']
 
 interval_regex = re.compile(r'((?P<hours>\d+?)hr)?((?P<minutes>\d+?)m)?((?P<seconds>\d+?)s)?')
 
@@ -127,7 +122,7 @@ def mergeResultData(result1, result2):
     # if there's no year we should update the ID after getting the year
     to_update_id = not result1.bib.get('year') or not 'ID' in result1.bib
 
-    for field in TRUSTED_BIB_FIELDS:
+    for field in BIB_FIELDS:
         if len(str(result2.bib.get(field, ''))) > len(str(result1.bib.get(field, ''))):
             result1.bib[field] = str(result2.bib[field])
 
@@ -339,7 +334,8 @@ class CrossrefSearch(NiceScraper):
             if item.get('type') in ['book']:
                 new_bib['ENTRYTYPE'] = 'book'
 
-            if item.get('type') not in ['journal-article', 'reference-entry', 'book', 'book-chapter', 'proceedings-article']:
+            if item.get('type') not in ['journal-article', 'reference-entry', 'book', 'book-chapter',
+                                        'proceedings-article']:
                 print(json.dumps(item, indent=3))
 
             for field in [('publisher-location', 'address'),
@@ -364,7 +360,7 @@ class CrossrefSearch(NiceScraper):
 
             authors = []
             for author in item['author']:
-                authors.append({'given': author.get('given',''), 'family': author.get('family','')})
+                authors.append({'given': author.get('given', ''), 'family': author.get('family', '')})
 
             new_bib['author'] = authorListFromDict(authors)
             new_extra = {'x_authors': authors,
@@ -549,11 +545,9 @@ class PubMedSearcher(NiceScraper):
             if 'pmcid' in ids[paper.pmid]:
                 paper.pmcid = ids[paper.pmid]['pmcid']
 
-        res = self.getMetadata(paper.pmid)[0]
+        res = self.getMetadata([paper.pmid])[0]
 
-        for field in ['title', 'doi', 'year', 'abstract', 'author']:
-            if field in res.bib:
-                paper.bib[field] = str(res[field])
+        mergeResultData(paper, res)
 
         paper.extra_data['done_pubmed'] = True
 
@@ -734,7 +728,7 @@ def enrichMetadata(paper: Paper, identity):
 
     # try PubMed if we still don't have a DOI or PMID
     if not paper.pmid and not paper.extra_data.get('done_pubmed'):
-    # if (not paper.doi or not paper.has_full_abstract) and not paper.pmid and not paper.extra_data.get('done_pubmed'):
+        # if (not paper.doi or not paper.has_full_abstract) and not paper.pmid and not paper.extra_data.get('done_pubmed'):
         if pubmedsearcher.matchPaper(paper, identity, ok_title_distance=0.4):
             pubmedsearcher.enrichWithMetadata(paper)
             paper.extra_data['done_pubmed'] = True
@@ -754,7 +748,6 @@ def enrichMetadata(paper: Paper, identity):
         scholarmetadata.getBibtex(paper)
 
     paper.bib = fixBibData(paper.bib, 1)
-
 
 
 def test():
