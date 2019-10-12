@@ -5,7 +5,7 @@ from .base_search import Searcher, MAX_RESULTS, SearchResult
 import bibtexparser
 from tqdm import tqdm
 from random import random
-from db.bibtex import fixBibData, getDOIfromURL
+from db.bibtex import fixBibData, getDOIfromURL, addUrlIfNew, isPDFURL
 
 
 class GScholarSearcher(Searcher):
@@ -33,13 +33,26 @@ class GScholarSearcher(Searcher):
 
             extra_data = {}
 
-            for field in ['citedby', 'id_scholarcitedby', 'url_scholarbib', 'url']:
+            for field in ['scholar_citedby', 'url_scholarbib']:
                 if hasattr(result, field):
                     extra_data[field] = getattr(result, field)
 
+            if hasattr(result, 'id_scholarcitedby'):
+                extra_data['scholarid'] = result.id_scholarcitedby
+
+            for field in ['url', 'eprint']:
+
+                if hasattr(result, field):
+                    bib[field] = getattr(result, field)
+
+                    if isPDFURL(result.url):
+                        addUrlIfNew(result, result.url, 'pdf', 'scholar')
+                    else:
+                        addUrlIfNew(result, result.url, 'main', 'scholar')
+
             doi = getDOIfromURL(bib.get('url'))
             if not doi:
-                doi = getDOIfromURL(bib.get('eprint'))
+                doi = getDOIfromURL(bib.get('eprint', ''))
 
             if doi:
                 bib['doi'] = doi
