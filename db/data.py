@@ -72,10 +72,9 @@ def generateUniqueID(paper):
 
 
 class Paper:
-    def __init__(self, bib: dict = None, extra_data: dict = None, pmid=None, scholarid=None, arxivid=None):
+    def __init__(self, bib: dict = None, extra_data: dict = None):
         self.bib = bib
         self.extra_data = extra_data
-        self.scholarid = scholarid
 
         for field in bib:
             if bib[field] is None:
@@ -84,11 +83,11 @@ class Paper:
     @classmethod
     def fromRecord(cls, paper_record):
         res = Paper(json.loads(paper_record["bib"]),
-                    json.loads(paper_record["extra_data"]),
-                    pmid=paper_record["pmid"],
-                    scholarid=paper_record["scholarid"],
-                    arxivid=paper_record["arxivid"],
-                    )
+                    json.loads(paper_record["extra_data"]))
+
+        res.pmid = paper_record["pmid"],
+        res.scholarid = paper_record["scholarid"],
+        res.arxivid = paper_record["arxivid"],
         return res
 
     @property
@@ -188,6 +187,14 @@ class Paper:
             return False
 
         return True
+
+    @property
+    def has_pdf_link(self):
+        for url in self.extra_data.get('urls',[]):
+            if url.get('type')=='pdf' or 'pdf' in url.get('url',''):
+                return True
+
+        return False
 
 
     def asDict(self):
@@ -380,5 +387,3 @@ def test2():
 
 if __name__ == '__main__':
     test2()
-
-
