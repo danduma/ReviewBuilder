@@ -21,25 +21,18 @@ def main(conf):
     if conf.query_file:
         with open(conf.query_file, 'r') as f:
             query = f.read()
-            print(query)
     else:
         query = conf.query
 
+    print("Query:", query)
+
     results = searcher.search(query, min_year=conf.year_start, max_results=conf.max)
-    found, missing = paperstore.matchResultsWithPapers(results)
 
-    papers_to_add = [Paper(res.bib, res.extra_data) for res in missing]
-    enrichAndUpdateMetadata(papers_to_add, paperstore, conf.email)
-
-    papers_existing = [res.paper for res in found]
-    # enrichAndUpdateMetadata(papers_existing)
-
-    all_papers = papers_to_add + papers_existing
-    write_bibtex(all_papers, conf.file)
+    write_bibtex([Paper(res.bib, res.extra_data) for res in results], conf.file)
 
 
 if __name__ == '__main__':
-    parser = ArgumentParser(description='Saves article search results to a file')
+    parser = ArgumentParser(description='Searches an engine and saves results to a file')
 
     parser.add_argument('-q', '--query', type=str,
                         help='The query to use to retrieve the articles')
