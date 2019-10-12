@@ -28,6 +28,12 @@ def main(conf):
 
     results = searcher.search(query, min_year=conf.year_start, max_results=conf.max)
 
+    if conf.cache:
+        found, missing = paperstore.matchResultsWithPapers(results)
+
+        papers_to_add = [Paper(res.bib, res.extra_data) for res in missing]
+        paperstore.updatePapers(papers_to_add)
+
     write_bibtex([Paper(res.bib, res.extra_data) for res in results], conf.file)
 
 
