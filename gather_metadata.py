@@ -12,7 +12,7 @@ def getSearchResultsFromBib(bib_entries, max_results):
     for index, bib in enumerate(bib_entries[:max_results]):
         res = SearchResult(index, bib, 'bibfile', {})
         if bib.get('note'):
-            match = re.search('(\d+)\scites:\s.+?scholar\?cites\=(\d+)')
+            match = re.search('(\d+)\scites:\s.+?scholar\?cites\=(\d+)', bib['note'])
             if match:
                 res.source = 'scholar'
                 res.extra_data['scholarid'] = match.group(2)
