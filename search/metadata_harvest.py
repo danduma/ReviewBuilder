@@ -3,7 +3,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 import requests
-import re
+import re, json
 import urllib.parse
 from strsimpy.normalized_levenshtein import NormalizedLevenshtein
 from db.bibtex import readBibtexString, authorListFromDict, fixBibData, getDOIfromURL, parseBibAuthors, addUrlIfNew, \
@@ -329,12 +329,18 @@ class CrossrefSearch(NiceScraper):
                 if item.get('type') in ['journal-article', 'reference-entry']:
                     new_bib['journal'] = removeListWrapper(item['container-title'])
                     new_bib['ENTRYTYPE'] = 'article'
+                elif item.get('type') in ['book-chapter']:
+                    new_bib['ENTRYTYPE'] = 'inbook'
+                    new_bib['booktitle'] = removeListWrapper(item['container-title'])
+                elif item.get('type') in ['proceedings-article']:
+                    new_bib['ENTRYTYPE'] = 'inproceedings'
+                    new_bib['booktitle'] = removeListWrapper(item['container-title'])
 
             if item.get('type') in ['book']:
                 new_bib['ENTRYTYPE'] = 'book'
 
-            if item.get('type') not in ['journal-article', 'reference-entry', 'book']:
-                print(item)
+            if item.get('type') not in ['journal-article', 'reference-entry', 'book', 'book-chapter', 'proceedings-article']:
+                print(json.dumps(item, indent=3))
 
             for field in [('publisher-location', 'address'),
                           ('publisher', 'publisher'),
@@ -358,7 +364,7 @@ class CrossrefSearch(NiceScraper):
 
             authors = []
             for author in item['author']:
-                authors.append({'given': author['given'], 'family': author['family']})
+                authors.append({'given': author.get('given',''), 'family': author.get('family','')})
 
             new_bib['author'] = authorListFromDict(authors)
             new_extra = {'x_authors': authors,
