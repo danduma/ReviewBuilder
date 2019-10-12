@@ -179,6 +179,17 @@ class Paper:
                 return True
         return False
 
+    @property
+    def has_full_abstract(self):
+        if not self.abstract:
+            return False
+
+        if self.abstract.endswith('…'):
+            return False
+
+        return True
+
+
     def asDict(self):
         return {
             "id": self.id,
@@ -369,3 +380,5 @@ def test2():
 
 if __name__ == '__main__':
     test2()
+
+
