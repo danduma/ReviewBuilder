@@ -12,25 +12,49 @@ def fixBibData(bib, index):
     """
     if "ENTRYTYPE" not in bib:
         bib["ENTRYTYPE"] = "ARTICLE"
-    if "ID" not in bib:
+    if "ID" not in bib or bib.get('year'):
         authors = parseBibAuthors(bib["author"])
         # bib["ID"] = 'id' + str(index)
-        bib["ID"] = authors[0]["family"] + bib.get("year", "____") + bib["title"].split()[0].lower()
+        bib["ID"] = authors[0]["family"] + bib.get("year", "YEAR") + bib["title"].split()[0].lower()
         # if not bib.get("year"):
         #     assert False
 
     return bib
 
 
+def isPDFURL(url):
+    return ('pdf' in url or 'openreview' in url)
+
 def getDOIfromURL(url):
     if not url:
         return None
 
-    match = re.search('(10\.\d+\/[a-zA-Z\.\d]+)\/?', url)
+    match = re.search('(10\.\d+\/[a-zA-Z\.\d\-\_]+)\.pdf', url)
     if match:
         return match.group(1)
+
+    match = re.search('(10\.\d+\/[a-zA-Z\.\d\-\_]+)/', url)
+    if match:
+        return match.group(1)
+
+    match = re.search('(10\.\d+\/[a-zA-Z\.\d\-\_]+)\?', url)
+    if match:
+        return match.group(1)
+
+    match = re.search('(10\.\d+\/[a-zA-Z\.\d\-\_]+)', url)
+    if match:
+        return match.group(1)
+
     return None
 
+print('DOIs')
+print(getDOIfromURL("https://link.springer.com/article/10.1007/s10278-017-0027-x"))
+print(getDOIfromURL("https://link.springer.com/article/10.1186/s12911-019-0908-7"))
+print(getDOIfromURL("https://pubs.rsna.org/doi/pdf/10.1148/radiol.2018171093"))
+print(getDOIfromURL("https://www.atsjournals.org/doi/pdf/10.1164/ajrccm-conference.2016.193.1_MeetingAbstracts.A1091"))
+print(getDOIfromURL("https://pubs.rsna.org/doi/pdf/10.1148/radiol.16142770"))
+print(getDOIfromURL("https://ascopubs.org/doi/pdfdirect/10.1200/CCI.18.00138"))
+print(getDOIfromURL("https://link.springer.com/article/10.1186/s12911-019-0908-7"))
 
 def parseBibAuthors(authors):
     bits = authors.split('and')
@@ -62,6 +86,21 @@ def authorListFromDict(authors):
 
     authors_string = " and ".join(authorstrings)
     return authors_string
+
+
+def normalizeURL(url: str):
+    return url.replace('https:', 'http:')
+
+
+def addUrlIfNew(paper, url: str, type: str, source: str):
+    paper.extra_data['urls'] = paper.extra_data.get('urls', [])
+
+    existing_urls = [normalizeURL(u['url']).lower() for u in paper.extra_data['urls']]
+
+    if url.lower() not in existing_urls:
+        paper.extra_data['urls'].append({'url': normalizeURL(url),
+                                         'type': type,
+                                         'source': source})
 
 
 def readBibtexString(bibstr):
