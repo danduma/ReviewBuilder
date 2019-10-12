@@ -33,7 +33,7 @@ class GScholarSearcher(Searcher):
 
             extra_data = {}
 
-            for field in ['scholar_citedby', 'url_scholarbib']:
+            for field in ['citedby', 'url_scholarbib']:
                 if hasattr(result, field):
                     extra_data[field] = getattr(result, field)
 
