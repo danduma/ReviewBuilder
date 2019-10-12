@@ -25,6 +25,7 @@ def fixBibData(bib, index):
 def isPDFURL(url):
     return ('pdf' in url or 'openreview' in url)
 
+
 def getDOIfromURL(url):
     if not url:
         return None
@@ -47,14 +48,6 @@ def getDOIfromURL(url):
 
     return None
 
-print('DOIs')
-print(getDOIfromURL("https://link.springer.com/article/10.1007/s10278-017-0027-x"))
-print(getDOIfromURL("https://link.springer.com/article/10.1186/s12911-019-0908-7"))
-print(getDOIfromURL("https://pubs.rsna.org/doi/pdf/10.1148/radiol.2018171093"))
-print(getDOIfromURL("https://www.atsjournals.org/doi/pdf/10.1164/ajrccm-conference.2016.193.1_MeetingAbstracts.A1091"))
-print(getDOIfromURL("https://pubs.rsna.org/doi/pdf/10.1148/radiol.16142770"))
-print(getDOIfromURL("https://ascopubs.org/doi/pdfdirect/10.1200/CCI.18.00138"))
-print(getDOIfromURL("https://link.springer.com/article/10.1186/s12911-019-0908-7"))
 
 def parseBibAuthors(authors):
     bits = authors.split('and')
