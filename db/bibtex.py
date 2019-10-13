@@ -94,9 +94,10 @@ def addUrlIfNew(paper, url: str, type: str, source: str):
     paper.extra_data['urls'] = paper.extra_data.get('urls', [])
 
     existing_urls = [normalizeURL(u['url']).lower() for u in paper.extra_data['urls']]
+    norm_url = normalizeURL(url)
 
-    if url.lower() not in existing_urls:
-        paper.extra_data['urls'].append({'url': normalizeURL(url),
+    if norm_url.lower() not in existing_urls:
+        paper.extra_data['urls'].append({'url': norm_url,
                                          'type': type,
                                          'source': source})
 
