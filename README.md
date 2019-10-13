@@ -10,6 +10,8 @@ Currently supports one use case: creating a bibtex file with the results of a Go
 
 ## Installation
 
+Tested on Python 3.7 only. May work with earlier versions of Python 3, but not 2.
+
 > pip install -r requirements.txt
 
 ## Example usage
