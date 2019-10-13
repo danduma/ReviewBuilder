@@ -44,6 +44,8 @@ if __name__ == '__main__':
                         help='The query to use to retrieve the articles')
     parser.add_argument('-qf', '--query-file', type=str,
                         help='Text file containing the query to use to retrieve the articles')
+    parser.add_argument('-h', '--headers-file', type=str,
+                        help='YAML file containing the headers to use for requests, particularly to Google Scholar')
     parser.add_argument('-ys', '--year-start', type=int,
                         help='The minimum year for results')
     parser.add_argument('-ye', '--year-end', type=int,
