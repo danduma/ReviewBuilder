@@ -6,7 +6,6 @@ from db.bibtex import write_bibtex, read_bibtex_file
 
 from search.base_search import getSearchResultsFromBib
 
-
 def main(conf):
     if conf.cache:
         paperstore = PaperStore()
@@ -16,14 +15,20 @@ def main(conf):
     bib_entries = read_bibtex_file(conf.input)
     results = getSearchResultsFromBib(bib_entries, conf.max)
 
-    found, missing = paperstore.matchResultsWithPapers(results)
+    if paperstore:
+        found, missing = paperstore.matchResultsWithPapers(results)
+    else:
+        found = []
+        missing = results
 
     papers_to_add = [Paper(res.bib, res.extra_data) for res in missing]
-    successful, unsuccessful = enrichAndUpdateMetadata(papers_to_add, paperstore, conf.email)
+
+    if conf.cache:
+        successful, unsuccessful = enrichAndUpdateMetadata(papers_to_add, paperstore, conf.email)
 
     papers_existing = [res.paper for res in found]
 
-    if conf.force:
+    if conf.force and conf.cache:
         enrichAndUpdateMetadata(papers_existing, paperstore, conf.email)
 
     all_papers = papers_to_add + papers_existing
