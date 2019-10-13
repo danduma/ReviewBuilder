@@ -72,6 +72,11 @@ def generateUniqueID(paper):
 
 
 class Paper:
+    """
+    A Paper consists of 2 dicts: .bib and .extra_data
+    - .bib is simply a bibtex dict
+    - .extra_data stores everything else we can't properly store in a BibTeX file
+    """
     def __init__(self, bib: dict = None, extra_data: dict = None):
         self.bib = bib
         self.extra_data = extra_data
