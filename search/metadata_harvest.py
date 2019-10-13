@@ -5,10 +5,9 @@ warnings.filterwarnings("ignore")
 import requests
 import re, json
 import urllib.parse
-from strsimpy.normalized_levenshtein import NormalizedLevenshtein
-from db.bibtex import readBibtexString, authorListFromDict, fixBibData, getDOIfromURL, parseBibAuthors, addUrlIfNew, \
-    isPDFURL
-from db.data import Paper
+from db.bibtex import readBibtexString, authorListFromDict, fixBibData, getDOIfromURL, addUrlIfNew, \
+    isPDFURL, getBibtextFromDOI
+from db.data import Paper, computeAuthorDistance, rerankByTitleSimilarity, basicTitleCleaning, dist, removeListWrapper
 from .base_search import SearchResult
 from tqdm import tqdm
 import datetime
@@ -17,13 +16,11 @@ from datetime import timedelta
 from io import StringIO, BytesIO
 from lxml import etree
 
-dist = NormalizedLevenshtein()
-
-BIB_FIELDS = ['abstract', 'address', 'annote', 'author', 'booktitle', 'chapter',
-              'crossref', 'doi', 'edition', 'editor',
-              'howpublished', 'institution', 'issue', 'journal', 'key',
-              'month', 'note', 'number', 'organization',
-              'pages', 'publisher', 'school', 'series', 'type', 'volume', 'year']
+BIB_FIELDS_TRANSFER = ['abstract', 'address', 'annote', 'author', 'booktitle', 'chapter',
+                       'crossref', 'doi', 'edition', 'editor',
+                       'howpublished', 'institution', 'issue', 'journal', 'key',
+                       'month', 'note', 'number', 'organization',
+                       'pages', 'publisher', 'school', 'series', 'type', 'volume', 'year']
 
 interval_regex = re.compile(r'((?P<hours>\d+?)hr)?((?P<minutes>\d+?)m)?((?P<seconds>\d+?)s)?')
 
@@ -38,57 +35,6 @@ def parse_time(time_str):
         if param:
             time_params[name] = int(param)
     return timedelta(**time_params)
-
-
-def removeListWrapper(value):
-    while isinstance(value, list):
-        value = value[0]
-    return value
-
-
-def computeAuthorDistance(paper1, paper2):
-    """
-    Returns a measure of how much the authors of papers overlap
-
-    :param paper1:
-    :param paper2:
-    :return:
-    """
-    authors1 = paper1.extra_data.get('x_authors', parseBibAuthors(paper1.bib['author']))
-    authors2 = paper2.extra_data.get('x_authors', parseBibAuthors(paper2.bib['author']))
-
-    score = 0
-    if len(authors1) >= len(authors2):
-        a_short = authors2
-        a_long = authors1
-    else:
-        a_short = authors1
-        a_long = authors2
-
-    max_score = 0
-
-    for index, author in enumerate(a_short):
-        factor = (len(a_long) - index) ** 2
-        if author['family'].lower() == a_long[index]['family'].lower():
-            score += factor
-
-        max_score += factor
-
-    if max_score == 0:
-        return 1
-
-    distance = 1 - (score / max_score)
-    return distance
-
-
-def getBibtextFromDOI(doi: str):
-    assert doi
-    headers = {'Accept': 'text/bibliography; style=bibtex'}
-    url = 'http://doi.org/' + doi
-    r = requests.get(url, headers=headers)
-    text = r.content.decode('utf-8')
-    bib = readBibtexString(text)
-    return bib
 
 
 def refreshDOIfromURLs(paper):
@@ -122,7 +68,7 @@ def mergeResultData(result1, result2):
     # if there's no year we should update the ID after getting the year
     to_update_id = not result1.bib.get('year') or not 'ID' in result1.bib
 
-    for field in BIB_FIELDS:
+    for field in BIB_FIELDS_TRANSFER:
         if len(str(result2.bib.get(field, ''))) > len(str(result1.bib.get(field, ''))):
             result1.bib[field] = str(result2.bib[field])
 
@@ -145,19 +91,6 @@ def mergeResultData(result1, result2):
 
     refreshDOIfromURLs(result1)
     return result1
-
-
-def basicTitleCleaning(title):
-    return re.sub(r'\s+', ' ', title, flags=re.MULTILINE)
-
-
-def rerankBySimilarity(results: list, paper: Paper):
-    scores = []
-    for res in results:
-        res.bib['title'] = basicTitleCleaning(res.bib['title'])
-        scores.append((dist.distance(res.bib['title'].lower(), paper.title.lower()), res))
-
-    return sorted(scores, key=lambda x: x[0], reverse=False)
 
 
 class NiceScraper:
@@ -235,7 +168,7 @@ class NiceScraper:
     def search(self, title, identity, max_results=5):
         raise NotImplementedError
 
-    def matchPaper(self, paper, identity, ok_title_distance=0.1, ok_author_distance=0.1):
+    def matchPaperFromResults(self, paper, identity, ok_title_distance=0.1, ok_author_distance=0.1):
         """
         Tries to match a paper with a DOI and retrieves its metadata if successful
 
@@ -254,7 +187,7 @@ class NiceScraper:
         if not results:
             return False
 
-        sorted_results = rerankBySimilarity(results, paper)
+        sorted_results = rerankByTitleSimilarity(results, paper.title)
 
         top_res = sorted_results[0][1]
 
@@ -263,24 +196,22 @@ class NiceScraper:
 
         if title_distance > 0.1:
             if title_distance <= ok_title_distance and author_distance <= ok_author_distance:
-                print('[matched] Title distance is above 0.1, but within settings')
-                print('Query title:', paper.title)
+                print('\n[matched] Title distance is above 0.1, but within settings')
+                print('Title:', paper.title)
                 print('Best match:', top_res['title'])
-                print('title distance:', title_distance)
-                print('author distance:', author_distance)
+                print('title distance:', title_distance, 'author distance:', author_distance)
             else:
-                print('[skipped] Distance is too great \n')
-                print('Query title:', paper.title)
-                print('title distance:', title_distance)
-                print('author distance:', author_distance)
-                print('Options:\n' + '\n'.join([r[1]['title'] for r in sorted_results]))
+                print('\n[skipped] Distance is too great \n')
+                print('Title:', paper.title)
+                print('title distance:', title_distance, 'author distance:', author_distance)
+                print('Options:\n' + '\n'.join([r[1]['title'] for r in sorted_results]), '\n')
                 return False
 
         try:
             mergeResultData(paper, top_res)
             return True
         except Exception as e:
-            print('Error during %s.matchPaper() mergeResultData()' % class_name, e)
+            print('Error during %s.matchPaperFromResults() mergeResultData()' % class_name, e)
             return False
 
 
@@ -359,10 +290,12 @@ class CrossrefSearch(NiceScraper):
                     new_bib['day'] = str(date_parts[2])
 
             authors = []
-            for author in item['author']:
+            for author in item.get('author', []):
                 authors.append({'given': author.get('given', ''), 'family': author.get('family', '')})
 
-            new_bib['author'] = authorListFromDict(authors)
+            if item.get('author'):
+                new_bib['author'] = authorListFromDict(authors)
+
             new_extra = {'x_authors': authors,
                          'language': item.get('language')
                          }
@@ -399,11 +332,11 @@ class UnpaywallMetadata(NiceScraper):
         if not top_url:
             return
 
-        if 'url_for_pdf' in top_url:
+        if top_url.get('url_for_pdf') in top_url:
             addUrlIfNew(paper, top_url['url_for_pdf'], 'pdf', 'unpaywall')
-        if 'url_for_landing_page' in top_url:
+        if top_url.get('url_for_landing_page'):
             addUrlIfNew(paper, top_url['url_for_landing_page'], 'main', 'unpaywall')
-        if 'url' in top_url:
+        if top_url.get('url'):
             url = top_url['url']
             if isPDFURL(url):
                 type = 'pdf'
@@ -415,7 +348,7 @@ class UnpaywallMetadata(NiceScraper):
         paper.extra_data['done_unpaywall'] = True
 
 
-class PubMedSearcher(NiceScraper):
+class PubMedSearch(NiceScraper):
     def search(self, title, identity, max_results=5):
         url = f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax={max_results}&sort=relevance&term='
         url += urllib.parse.quote(title)
@@ -675,7 +608,7 @@ class SemanticScholarMetadata(NiceScraper):
 crossrefsearcher = CrossrefSearch()
 scholarmetadata = GScholarMetadata(basic_delay=0.1)
 unpaywallmetadata = UnpaywallMetadata(rate_limit=100000, rate_interval='24h')
-pubmedsearcher = PubMedSearcher()
+pubmedsearcher = PubMedSearch()
 arxivsearcher = arXivSearcher()
 semanticscholarmetadata = SemanticScholarMetadata()
 
@@ -704,22 +637,22 @@ def enrichMetadata(paper: Paper, identity):
 
     :param paper: Paper instance
     """
+    paper.title = basicTitleCleaning(paper.title)
+    original_title = paper.title
+
     if paper.pmid and not paper.extra_data.get("done_pubmed"):
         pubmedsearcher.enrichWithMetadata(paper)
         paper.extra_data['done_pubmed'] = True
 
     # if we don't have a DOI, we need to find it on Crossref
-    if not paper.doi:
-        paper.title = basicTitleCleaning(paper.title)
+    if not paper.doi and not paper.extra_data.get('done_crossref', False):
+        crossrefsearcher.matchPaperFromResults(paper, identity)
 
-        if not paper.extra_data.get('done_crossref', False):
-            crossrefsearcher.matchPaper(paper, identity)
-
-            if paper.doi:
-                new_bib = getBibtextFromDOI(paper.doi)
-                paper = mergeResultData(paper,
-                                        SearchResult(1, new_bib[0], 'crossref', paper.extra_data))
-                paper.extra_data['done_crossref'] = True
+        if paper.doi:
+            new_bib = getBibtextFromDOI(paper.doi)
+            paper = mergeResultData(paper,
+                                    SearchResult(1, new_bib[0], 'crossref', paper.extra_data))
+            paper.extra_data['done_crossref'] = True
 
     # if we have a DOI and we haven't got the abstract yet
     if paper.doi and not paper.extra_data.get('done_semanticscholar'):
@@ -729,13 +662,14 @@ def enrichMetadata(paper: Paper, identity):
     # try PubMed if we still don't have a DOI or PMID
     if not paper.pmid and not paper.extra_data.get('done_pubmed'):
         # if (not paper.doi or not paper.has_full_abstract) and not paper.pmid and not paper.extra_data.get('done_pubmed'):
-        if pubmedsearcher.matchPaper(paper, identity, ok_title_distance=0.4):
+        if pubmedsearcher.matchPaperFromResults(paper, identity, ok_title_distance=0.4):
             pubmedsearcher.enrichWithMetadata(paper)
             paper.extra_data['done_pubmed'] = True
 
     # if we don't have an abstract maybe it's on arXiv
-    if not paper.has_full_abstract and not paper.extra_data.get('done_arxiv'):
-        if arxivsearcher.matchPaper(paper, identity, ok_title_distance=0.35):
+    # if not paper.has_full_abstract and not paper.extra_data.get('done_arxiv'):
+    if not paper.extra_data.get('done_arxiv'):
+        if arxivsearcher.matchPaperFromResults(paper, identity, ok_title_distance=0.35):
             paper.extra_data['done_arxiv'] = True
 
     # try to get open access links if DOI present and missing PDF link
@@ -747,6 +681,8 @@ def enrichMetadata(paper: Paper, identity):
     if not paper.year and paper.extra_data.get('url_scholarbib'):
         scholarmetadata.getBibtex(paper)
 
+    if paper.title != original_title:
+        print('Original: %s\nNew: %s' % (original_title, paper.title))
     paper.bib = fixBibData(paper.bib, 1)
 
 
