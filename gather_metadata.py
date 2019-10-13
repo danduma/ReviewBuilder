@@ -1,25 +1,10 @@
 from db.data import PaperStore, Paper
 
-from search import enrichAndUpdateMetadata, SearchResult
+from search import enrichAndUpdateMetadata
 from argparse import ArgumentParser
 from db.bibtex import write_bibtex, read_bibtex_file
 
-import re
-
-
-def getSearchResultsFromBib(bib_entries, max_results):
-    results = []
-    for index, bib in enumerate(bib_entries[:max_results]):
-        res = SearchResult(index, bib, 'bibfile', {})
-        if bib.get('note'):
-            match = re.search('(\d+)\scites:\s.+?scholar\?cites\=(\d+)', bib['note'])
-            if match:
-                res.source = 'scholar'
-                res.extra_data['scholarid'] = match.group(2)
-                res.extra_data['citedby'] = match.group(1)
-        results.append(res)
-
-    return results
+from search.base_search import getSearchResultsFromBib
 
 
 def main(conf):
