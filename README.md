@@ -1,7 +1,7 @@
 # ReviewBuilder
 A collection of tools for automating parts of a Systematic Review of scientific literature.
 
-Currently supports one use case: creating a bibtex file with the results of a Google Scholar search and augmenting the metadata for each result by retrieving its abstract and finding [Open Access](https://en.wikipedia.org/wiki/Open_access) versions of the paper, including preprints. All results are cached locally in a SQLite database, aiming to make iterating over queries for obtaining papers for a review less painful.
+Currently supports one use case: creating a bibtex file with the results of a Google Scholar search and augmenting the metadata for each result by retrieving its abstract and finding [Open Access](https://en.wikipedia.org/wiki/Open_access) versions of the paper on the web, including preprints. All results are cached locally in a SQLite database, aiming to make iterating over queries for obtaining papers for a review less painful.
 
 - Implemented: Google Scholar, Crossref, Semantic Scholar (metadata), PubMed, arXiv, Unpaywall.
 - Not yet implemented: Microsoft Academic, Semantic Scholar (search), Web of Science
