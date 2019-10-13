@@ -39,7 +39,7 @@ def main(conf):
     papers_existing = [res.paper for res in found]
 
     if conf.force:
-        enrichAndUpdateMetadata(papers_existing)
+        enrichAndUpdateMetadata(papers_existing, paperstore, conf.email)
 
     all_papers = papers_to_add + papers_existing
     write_bibtex(all_papers, conf.output)
