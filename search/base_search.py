@@ -1,3 +1,5 @@
+import re
+
 MAX_RESULTS = 100
 
 
@@ -25,3 +27,18 @@ class SearchResult:
             self.index, self.bib.get("title", ""),
             self.bib.get("author", ""),
             self.bib.get("year", ""), str(self.bib))
+
+
+def getSearchResultsFromBib(bib_entries, max_results):
+    results = []
+    for index, bib in enumerate(bib_entries[:max_results]):
+        res = SearchResult(index, bib, 'bibfile', {})
+        if bib.get('note'):
+            match = re.search('(\d+)\scites:\s.+?scholar\?cites\=(\d+)', bib['note'])
+            if match:
+                res.source = 'scholar'
+                res.extra_data['scholarid'] = match.group(2)
+                res.extra_data['citedby'] = match.group(1)
+        results.append(res)
+
+    return results
