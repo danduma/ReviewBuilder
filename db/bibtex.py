@@ -2,6 +2,8 @@ import bibtexparser
 import re
 import random
 
+import requests
+
 
 def fixBibData(bib, index):
     """
@@ -149,3 +151,13 @@ def test():
 
 if __name__ == '__main__':
     test()
+
+
+def getBibtextFromDOI(doi: str):
+    assert doi
+    headers = {'Accept': 'text/bibliography; style=bibtex'}
+    url = 'http://doi.org/' + doi
+    r = requests.get(url, headers=headers)
+    text = r.content.decode('utf-8')
+    bib = readBibtexString(text)
+    return bib
