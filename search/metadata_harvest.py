@@ -667,8 +667,8 @@ def enrichMetadata(paper: Paper, identity):
             paper.extra_data['done_pubmed'] = True
 
     # if we don't have an abstract maybe it's on arXiv
-    # if not paper.has_full_abstract and not paper.extra_data.get('done_arxiv'):
-    if not paper.extra_data.get('done_arxiv'):
+    if not paper.has_full_abstract and not paper.extra_data.get('done_arxiv'):
+    # if not paper.extra_data.get('done_arxiv'):
         if arxivsearcher.matchPaperFromResults(paper, identity, ok_title_distance=0.35):
             paper.extra_data['done_arxiv'] = True
 
