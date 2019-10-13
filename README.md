@@ -7,7 +7,9 @@ Currently supports one use case: creating a bibtex file with the results of a Go
 - All data ingestion is _nice_ :), locally enforcing rate limiting, both from the known requirements of each service, and by parsing the `X-Rate-Limit-Limit` and `X-Rate-Limit-Interval` where provided in the response.
 - Implemented: [Google Scholar](https://scholar.google.com), [Crossref](https://www.crossref.org/services/metadata-delivery/rest-api/), [SemanticScholar (metadata)](https://api.semanticscholar.org/), [PubMed](https://www.ncbi.nlm.nih.gov/home/develop/api/), [arXiv](https://arxiv.org/help/api), [Unpaywall](https://unpaywall.org/products/api).
 - Not yet implemented: [Microsoft Academic](https://academic.microsoft.com), Semantic Scholar (search), [Web of Science](https://developer.clarivate.com/apis/wos)
-- Coming very soon: locally filtering results (i.e. "selecting articles for inclusion") based on keywords and the detected language the paper is written in.
+- Coming very soon: 
+  - locally filtering results (i.e. "selecting articles for inclusion") based on keywords and the detected language the paper is written in
+  - automatic downloading of PDFs
 
 ## Installation
 
