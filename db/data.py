@@ -4,6 +4,18 @@ import pandas as pd
 import bibtexparser
 import unicodedata
 
+from strsimpy import NormalizedLevenshtein
+
+stopwords = set(["i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you", "your", "yours", "yourself",
+                 "yourselves", "he", "him", "his", "himself", "she", "her", "hers", "herself", "it", "its",
+                 "itself", "they", "them", "their", "theirs", "themselves", "what", "which", "who", "whom", "this",
+                 "that", "these", "those", "am", "is", "are", "was", "were", "be", "been", "being", "have", "has",
+                 "had", "having", "do", "does", "did", "doing", "a", "an", "the", "and", "but", "if", "or",
+                 "because", "as", "until", "while", "of", "at", "by", "for", "with", "about", "against", "between",
+                 "into", "through", "during", "before", "after", "above", "below", "to", "from", "up", "down",
+                 "in", "out", "on", "off", "over", "under", "again", "further", "then", "once", "here", "there",
+                 "when", "where", "so", "than", "too", "very", "s", "t", "can", "will", "just", "don", "should", "now"])
+
 from db.bibtex import parseBibAuthors
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
@@ -77,6 +89,7 @@ class Paper:
     - .bib is simply a bibtex dict
     - .extra_data stores everything else we can't properly store in a BibTeX file
     """
+
     def __init__(self, bib: dict = None, extra_data: dict = None):
         self.bib = bib
         self.extra_data = extra_data
@@ -90,9 +103,9 @@ class Paper:
         res = Paper(json.loads(paper_record["bib"]),
                     json.loads(paper_record["extra_data"]))
 
-        res.pmid = paper_record["pmid"],
-        res.scholarid = paper_record["scholarid"],
-        res.arxivid = paper_record["arxivid"],
+        res.pmid = paper_record["pmid"]
+        res.scholarid = paper_record["scholarid"]
+        res.arxivid = paper_record["arxivid"]
         return res
 
     @property
@@ -155,6 +168,10 @@ class Paper:
     def authors(self):
         return self.bib.get("author")
 
+    @authors.setter
+    def authors(self, authors):
+        self.bib["author"] = authors
+
     @property
     def entrytype(self):
         return self.bib.get("ENTRYTYPE").lower()
@@ -195,12 +212,11 @@ class Paper:
 
     @property
     def has_pdf_link(self):
-        for url in self.extra_data.get('urls',[]):
-            if url.get('type')=='pdf' or 'pdf' in url.get('url',''):
+        for url in self.extra_data.get('urls', []):
+            if url.get('type') == 'pdf' or 'pdf' in url.get('url', ''):
                 return True
 
         return False
-
 
     def asDict(self):
         return {
@@ -307,6 +323,60 @@ class PaperStore:
             res.append(Paper.fromRecord(paper_record))
         return res
 
+    def findPaperByApproximateTitle(self, paper, ok_title_distance=0.35, ok_author_distance=0.1):
+        """
+        Very simple ngram-based similarity matching
+
+        :param title:
+        :return:
+        """
+        c = self.conn.cursor()
+
+        norm_title = normalizeTitle(paper.title)
+
+        bits = norm_title.split()
+        bits = [b for b in bits if b not in stopwords]
+
+        query_string = " OR ".join(bits)
+
+        c.execute('SELECT id, norm_title FROM papers_search WHERE norm_title MATCH ?', (query_string,))
+        paper_ids = c.fetchall()
+        if not paper_ids:
+            return None
+
+        paper_id_list = [res['id'] for res in paper_ids]
+        id_query_string = ",".join(['"%s"' % res['id'] for res in paper_ids])
+
+        c.execute('SELECT * FROM papers WHERE id IN (%s)' % id_query_string)
+        paper_records = c.fetchall()
+        if not paper_records:
+            return None
+
+        results = [Paper.fromRecord(r) for r in paper_records]
+
+        sorted_results = rerankByTitleSimilarity(results, paper.title)
+
+        top_res = sorted_results[0][1]
+
+        title_distance = dist.distance(top_res.title.lower(), paper.title.lower())
+        author_distance = computeAuthorDistance(paper, top_res)
+
+
+        if title_distance <= ok_title_distance and author_distance <= ok_author_distance:
+            print('\n[matched] ', paper.title)
+            print('Best match:', top_res.title)
+        else:
+            print('\n[skipped] ', paper.title)
+            print('Options:\n' + '\n'.join([r[1].title for r in sorted_results[:5]]), '\n')
+            return None
+
+        print('title distance:', title_distance, 'author distance:', author_distance)
+
+        new_paper = top_res
+        # new_paper.title = paper.title
+
+        return new_paper
+
     def addPaper(self, paper: Paper):
         self.addPapers([paper])
 
@@ -319,13 +389,28 @@ class PaperStore:
     def updatePapers(self, papers: list):
         for paper in papers:
             values = paper.asDict()
-            self.conn.execute(
-                """REPLACE INTO papers (id, doi, pmid, scholarid, arxivid, authors, year, title, norm_title, venue, bib, extra_data) values (?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (values['id'], values['doi'], values['pmid'], values['scholarid'],
-                 values['arxivid'], values['authors'], values['year'],
-                 values['title'], values['norm_title'], values['venue'],
-                 values['bib'], values['extra_data']))
+            try:
+                self.conn.execute(
+                    """REPLACE INTO papers (id, doi, pmid, scholarid, arxivid, authors, year, title, norm_title, venue, bib, extra_data) values (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (values['id'], values['doi'], values['pmid'], values['scholarid'],
+                     values['arxivid'], values['authors'], values['year'],
+                     values['title'], values['norm_title'], values['venue'],
+                     values['bib'], values['extra_data']))
+            except Exception as e:
+                print(e.__class__.__name__, e)
             self.conn.commit()
+
+    def createVirtualTable(self):
+        self.conn.execute(
+            """CREATE VIRTUAL TABLE IF NOT EXISTS papers_search USING fts5(id, norm_title, title);""")
+        self.conn.execute(
+            """REPLACE INTO papers_search (id, norm_title, title) SELECT id, norm_title, title from papers""")
+
+        self.conn.commit()
+
+    def deleteVirtualTable(self):
+        self.conn.execute("DROP TABLE papers_search")
+        self.conn.commit()
 
     def matchResultsWithPapers(self, results):
         """
@@ -336,6 +421,7 @@ class PaperStore:
         """
         found = []
         missing = []
+        self.createVirtualTable()
         for result in results:
             paper = Paper(result.bib, result.extra_data)
             paper_found = False
@@ -351,17 +437,76 @@ class PaperStore:
 
             if not paper_found:
                 paper_records = self.findPapersByTitle(paper.title)
-                # FIXME: should also match by author, within a year or 2, etc.
                 if paper_records:
                     result.paper = paper_records[0]
                     found.append(result)
                     paper_found = True
 
+                if not paper_found:
+                    paper_record = self.findPaperByApproximateTitle(paper)
+                    if paper_record:
+                        result.paper = paper_record
+                        found.append(result)
+                        paper_found = True
+
             if not paper_found:
                 missing.append(result)
 
+        self.deleteVirtualTable()
         return found, missing
 
+
+def computeAuthorDistance(paper1, paper2):
+    """
+    Returns a measure of how much the authors of papers overlap
+
+    :param paper1:
+    :param paper2:
+    :return:
+    """
+    authors1 = paper1.extra_data.get('x_authors', parseBibAuthors(paper1.bib['author']))
+    authors2 = paper2.extra_data.get('x_authors', parseBibAuthors(paper2.bib['author']))
+
+    score = 0
+    if len(authors1) >= len(authors2):
+        a_short = authors2
+        a_long = authors1
+    else:
+        a_short = authors1
+        a_long = authors2
+
+    max_score = 0
+
+    for index, author in enumerate(a_short):
+        factor = (len(a_long) - index) ** 2
+        if author['family'].lower() == a_long[index]['family'].lower():
+            score += factor
+
+        max_score += factor
+
+    if max_score == 0:
+        return 1
+
+    distance = 1 - (score / max_score)
+    return distance
+
+
+def basicTitleCleaning(title):
+    return re.sub(r'\s+', ' ', title, flags=re.MULTILINE)
+
+
+def rerankByTitleSimilarity(results: list, title):
+    scores = []
+    for res in results:
+        res.bib['title'] = basicTitleCleaning(res.bib['title'])
+        scores.append((dist.distance(res.bib['title'].lower(), title.lower()), res))
+
+    return sorted(scores, key=lambda x: x[0], reverse=False)
+
+def removeListWrapper(value):
+    while isinstance(value, list):
+        value = value[0]
+    return value
 
 def test1():
     bibstr = """@ARTICLE{Cesar2013,
@@ -392,3 +537,6 @@ def test2():
 
 if __name__ == '__main__':
     test2()
+dist = NormalizedLevenshtein()
+
+
