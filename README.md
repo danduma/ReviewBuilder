@@ -29,12 +29,15 @@ Once we have the list of results, we can collect extra data, such as the abstrac
 > python gather_metadata.py -i test.bib -o test_plus.bib --max 200
 
 This will process a maximum of 200 entries from the `test.bib` file, and output an "enriched" version to `test_plus.bib`. For each entry it will try to:
-- retrieve its DOI from the [Crossref](http://www.crossref.org/) API by searching for the title and retrieving the top 5 results and then picking the one with the most similar title that also has a reasonable overlap in authors' surnames
-- check [SemanticScholar](http://www.semanticscholar.org/) for metadata and abstract for the paper
-- search [PubMed](http://www.ncbi.nlm.nih.gov/pubmed/) for its PubMed ID (PMID) and retrieve the abstract from there, if available
-- search [arXiv](http://arxiv.org) for a preprint of the paper
-- search [Unpawall](http://unpaywall.org) for available open access versions of the paper
+1. match it with an entry in the local cache. If it can't be found go to step 2.
+1. attempt to match the paper with its DOI via the [Crossref](http://www.crossref.org/) API.
+1. once we have a DOI, check [SemanticScholar](http://www.semanticscholar.org/) for metadata and abstract for the paper
+1. if we don't have a DOI or abstract, search [PubMed](http://www.ncbi.nlm.nih.gov/pubmed/) for its PubMed ID (PMID) and retrieve the abstract from there, if available
+1. search [arXiv](http://arxiv.org) for a preprint of the paper
+1. search [Unpawall](http://unpaywall.org) for available open access versions of the paper if we are missing a PDF link from the above
 
-All of this information is automatically cached locally in a SQLite database, `papers.sqlite` created automatically in the /db directory.
+Many of these steps require approximate matching, both for the local cache and the results from the remote APIs. Often a preprint version of a paper will have a slightly different title or will be missing an author or two. This repo implements several heuristics for dealing with this.
+
+A SQLite database cache is automatically created in `papers.sqlite` in the /db directory.
 
 
