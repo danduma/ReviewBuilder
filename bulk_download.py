@@ -83,6 +83,11 @@ def bulkDownload(papers, root_dir, report_path):
             task_record['url'] = url
             task_record['url_source'] = url_source
             download_tasks.append(task_record)
+        else:
+            print(paper.extra_data)
+            print(paper.bib)
+            print()
+
 
     df = pd.DataFrame(download_tasks)
     df.to_csv('download_tasks.csv')
