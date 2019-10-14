@@ -212,7 +212,7 @@ class Paper:
 
     @property
     def has_abstract(self):
-        return (self.abstract is not None and self.abstract)
+        return self.abstract is not None and self.abstract
 
     @property
     def has_pdf_link(self):
