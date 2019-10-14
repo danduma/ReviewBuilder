@@ -129,7 +129,7 @@ class NiceScraper:
         if self.delay:
             sleep(self.delay)
 
-    def request(self, url, headers=None):
+    def request(self, url, headers=None, data=None, post=False):
         """
         Makes a nice request, enforcing rate limits and adjusting the wait time
         between requests based on latency
@@ -143,7 +143,10 @@ class NiceScraper:
         self.request_times.append(datetime.datetime.now())
         before = datetime.datetime.now()
 
-        r = requests.get(url, headers=headers)
+        if post:
+            r = requests.post(url, json=data, headers=headers)
+        else:
+            r = requests.get(url, headers=headers)
 
         duration = datetime.datetime.now() - before
 
@@ -564,7 +567,72 @@ class GScholarMetadata(NiceScraper):
             paper.bib = bib
 
 
-class SemanticScholarMetadata(NiceScraper):
+class SemanticScholarSearch(NiceScraper):
+
+    def loadSSAuthors(self, authors_dict):
+        authors = []
+        for author in authors_dict:
+            bits = author['name'].split()
+            new_author = {'given': bits[0], 'family': bits[-1]}
+            if len(bits) > 2:
+                new_author['middle'] = " ".join(bits[1:len(bits) - 1])
+            authors.append(new_author)
+        return authors
+
+    def search(self, title, identity, max_results=5):
+        url = 'https://www.semanticscholar.org/api/1/search'
+
+        data = {"queryString": title,
+                "page": 1,
+                "pageSize": 10,
+                "sort": "relevance",
+                "authors": [],
+                "coAuthors": [],
+                "venues": [],
+                "yearFilter": None,
+                "requireViewablePdf": False,
+                "publicationTypes": [],
+                "externalContentTypes": []
+                }
+
+        r = self.request(url, data=data, post=True)
+
+        results = r.json()
+        if 'results' in results:
+            results = results['results']
+        else:
+            return []
+
+        return_results = []
+        for res in results[:max_results]:
+
+            res_title = res['title']['text']
+
+            authors = self.loadSSAuthors(res['authors'][0])
+
+            bib = {'title': res_title,
+                   'abstract': res['paperAbstract'],
+                   'year': res['year']['text'],
+                   'url': 'https://www.semanticscholar.org/paper/{}/{}'.format(res['slug'],
+                                                                               res['id']),
+                   'author': authorListFromDict(authors)
+                   }
+            extra_data = {
+                'ss_id': res['id'],
+                'x_authors': authors
+            }
+
+            new_res = SearchResult(bib, extra_data)
+
+            for link in res.get('links', []):
+                if isPDFURL(link['url']):
+                    bib['eprint'] = link['url']
+                    addUrlIfNew(new_res, link['url'], 'pdf', 'semanticscholar')
+
+            venue = res['venue'].get('text')
+            return_results.append(new_res)
+        return return_results
+
     def getMetadata(self, paper):
         if not paper.doi:
             raise ValueError('paper has no DOI')
@@ -590,14 +658,7 @@ class SemanticScholarMetadata(NiceScraper):
             # https://www.semanticscholar.org/topic/{topicId}
             del topic['url']
 
-        authors = []
-        for author in d['authors']:
-            bits = author['name'].split()
-            new_author = {'given': bits[0], 'family': bits[-1]}
-            if len(bits) > 2:
-                new_author['middle'] = " ".join(bits[1:len(bits) - 1])
-            authors.append(new_author)
-
+        authors = self.loadSSAuthors(d['authors'])
         paper.bib['author'] = authorListFromDict(authors)
 
         paper.extra_data['ss_topics'] = d['topics']
@@ -610,7 +671,7 @@ scholarmetadata = GScholarMetadata(basic_delay=0.1)
 unpaywallmetadata = UnpaywallMetadata(rate_limit=100000, rate_interval='24h')
 pubmedsearcher = PubMedSearch()
 arxivsearcher = arXivSearcher()
-semanticscholarmetadata = SemanticScholarMetadata()
+semanticscholarmetadata = SemanticScholarSearch()
 
 
 def enrichAndUpdateMetadata(papers, paperstore, identity):
@@ -659,16 +720,21 @@ def enrichMetadata(paper: Paper, identity):
         semanticscholarmetadata.getMetadata(paper)
         paper.extra_data['done_semanticscholar'] = True
 
-    # try PubMed if we still don't have a DOI or PMID
+    # try PubMed if we still don't have a  PMID
     if not paper.pmid and not paper.extra_data.get('done_pubmed'):
         # if (not paper.doi or not paper.has_full_abstract) and not paper.pmid and not paper.extra_data.get('done_pubmed'):
         if pubmedsearcher.matchPaperFromResults(paper, identity, ok_title_distance=0.4):
             pubmedsearcher.enrichWithMetadata(paper)
             paper.extra_data['done_pubmed'] = True
 
+    # still no DOI? maybe we can get something from SemanticScholar
+    if not paper.extra_data.get('ss_id') and not paper.extra_data.get('done_semanticscholar'):
+        if semanticscholarmetadata.matchPaperFromResults(paper, identity):
+            paper.extra_data['done_semanticscholar'] = True
+
     # if we don't have an abstract maybe it's on arXiv
     if not paper.has_full_abstract and not paper.extra_data.get('done_arxiv'):
-    # if not paper.extra_data.get('done_arxiv'):
+        # if not paper.extra_data.get('done_arxiv'):
         if arxivsearcher.matchPaperFromResults(paper, identity, ok_title_distance=0.35):
             paper.extra_data['done_arxiv'] = True
 
