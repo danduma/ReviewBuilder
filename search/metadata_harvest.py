@@ -218,7 +218,7 @@ class NiceScraper:
             return False
 
 
-class CrossrefSearch(NiceScraper):
+class CrossrefScraper(NiceScraper):
 
     def bulkSearchCrossref(self, papers):
         pass
@@ -317,7 +317,7 @@ class CrossrefSearch(NiceScraper):
         return results
 
 
-class UnpaywallMetadata(NiceScraper):
+class UnpaywallScraper(NiceScraper):
 
     def getMetadata(self, paper, identity):
         if not paper.doi:
@@ -351,7 +351,7 @@ class UnpaywallMetadata(NiceScraper):
         paper.extra_data['done_unpaywall'] = True
 
 
-class PubMedSearch(NiceScraper):
+class PubMedScraper(NiceScraper):
     def search(self, title, identity, max_results=5):
         url = f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax={max_results}&sort=relevance&term='
         url += urllib.parse.quote(title)
@@ -545,7 +545,7 @@ class arXivSearcher(NiceScraper):
         return results
 
 
-class GScholarMetadata(NiceScraper):
+class GScholarScraper(NiceScraper):
     def getBibtex(self, paper):
         if paper.extra_data.get("url_scholarbib"):
             bib = paper.bib
@@ -567,7 +567,7 @@ class GScholarMetadata(NiceScraper):
             paper.bib = bib
 
 
-class SemanticScholarSearch(NiceScraper):
+class SemanticScholarScraper(NiceScraper):
 
     def loadSSAuthors(self, authors_dict):
         authors = []
@@ -597,9 +597,9 @@ class SemanticScholarSearch(NiceScraper):
 
         r = self.request(url, data=data, post=True)
 
-        results = r.json()
-        if 'results' in results:
-            results = results['results']
+        results_dict = r.json()
+        if 'results' in results_dict:
+            results = results_dict['results']
         else:
             return []
 
@@ -608,15 +608,25 @@ class SemanticScholarSearch(NiceScraper):
 
             res_title = res['title']['text']
 
-            authors = self.loadSSAuthors(res['authors'][0])
+            authors_processed = []
+            for author_list in res['authors']:
+                for author_dict in author_list:
+                    if 'name' in author_dict:
+                        authors_processed.append(author_dict)
+
+            authors = self.loadSSAuthors(authors_processed)
 
             bib = {'title': res_title,
                    'abstract': res['paperAbstract'],
                    'year': res['year']['text'],
                    'url': 'https://www.semanticscholar.org/paper/{}/{}'.format(res['slug'],
                                                                                res['id']),
-                   'author': authorListFromDict(authors)
+                   'author': authorListFromDict(authors),
                    }
+
+            if res.get('doiInfo'):
+                bib['doi'] = res['doiInfo'].get('doi')
+
             extra_data = {
                 'ss_id': res['id'],
                 'x_authors': authors
@@ -666,12 +676,12 @@ class SemanticScholarSearch(NiceScraper):
         paper.extra_data['ss_id'] = d['paperId']
 
 
-crossrefsearcher = CrossrefSearch()
-scholarmetadata = GScholarMetadata(basic_delay=0.1)
-unpaywallmetadata = UnpaywallMetadata(rate_limit=100000, rate_interval='24h')
-pubmedsearcher = PubMedSearch()
-arxivsearcher = arXivSearcher()
-semanticscholarmetadata = SemanticScholarSearch()
+crossref_scraper = CrossrefScraper()
+scholar_scraper = GScholarScraper(basic_delay=0.1)
+unpaywall_scraper = UnpaywallScraper(rate_limit=100000, rate_interval='24h')
+pubmed_scraper = PubMedScraper()
+arxiv_scraper = arXivSearcher()
+semanticscholarmetadata = SemanticScholarScraper()
 
 
 def enrichAndUpdateMetadata(papers, paperstore, identity):
@@ -702,12 +712,12 @@ def enrichMetadata(paper: Paper, identity):
     original_title = paper.title
 
     if paper.pmid and not paper.extra_data.get("done_pubmed"):
-        pubmedsearcher.enrichWithMetadata(paper)
+        pubmed_scraper.enrichWithMetadata(paper)
         paper.extra_data['done_pubmed'] = True
 
     # if we don't have a DOI, we need to find it on Crossref
     if not paper.doi and not paper.extra_data.get('done_crossref', False):
-        crossrefsearcher.matchPaperFromResults(paper, identity)
+        crossref_scraper.matchPaperFromResults(paper, identity)
 
         if paper.doi:
             new_bib = getBibtextFromDOI(paper.doi)
@@ -723,8 +733,8 @@ def enrichMetadata(paper: Paper, identity):
     # try PubMed if we still don't have a  PMID
     if not paper.pmid and not paper.extra_data.get('done_pubmed'):
         # if (not paper.doi or not paper.has_full_abstract) and not paper.pmid and not paper.extra_data.get('done_pubmed'):
-        if pubmedsearcher.matchPaperFromResults(paper, identity, ok_title_distance=0.4):
-            pubmedsearcher.enrichWithMetadata(paper)
+        if pubmed_scraper.matchPaperFromResults(paper, identity, ok_title_distance=0.4):
+            pubmed_scraper.enrichWithMetadata(paper)
             paper.extra_data['done_pubmed'] = True
 
     # still no DOI? maybe we can get something from SemanticScholar
@@ -735,17 +745,17 @@ def enrichMetadata(paper: Paper, identity):
     # if we don't have an abstract maybe it's on arXiv
     if not paper.has_full_abstract and not paper.extra_data.get('done_arxiv'):
         # if not paper.extra_data.get('done_arxiv'):
-        if arxivsearcher.matchPaperFromResults(paper, identity, ok_title_distance=0.35):
+        if arxiv_scraper.matchPaperFromResults(paper, identity, ok_title_distance=0.35):
             paper.extra_data['done_arxiv'] = True
 
     # try to get open access links if DOI present and missing PDF link
     if not paper.has_pdf_link and paper.doi and not paper.extra_data.get('done_unpaywall'):
-        unpaywallmetadata.getMetadata(paper, identity)
+        unpaywall_scraper.getMetadata(paper, identity)
         paper.extra_data['done_unpaywall'] = True
 
     # if all else has failed but we have a link to Google Scholar bib data, get that
     if not paper.year and paper.extra_data.get('url_scholarbib'):
-        scholarmetadata.getBibtex(paper)
+        scholar_scraper.getBibtex(paper)
 
     if paper.title != original_title:
         print('Original: %s\nNew: %s' % (original_title, paper.title))
@@ -760,7 +770,7 @@ def test():
     # res = searchCrossref(title)
     # for r in res:
     #     print(json.dumps(r, indent=3))
-    pubmedsearcher.search(title, 'dduma@ed.ac.uk')
+    pubmed_scraper.search(title, 'dduma@ed.ac.uk')
 
 
 if __name__ == '__main__':
