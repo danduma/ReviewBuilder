@@ -211,6 +211,10 @@ class Paper:
         return True
 
     @property
+    def has_abstract(self):
+        return (self.abstract is not None and self.abstract)
+
+    @property
     def has_pdf_link(self):
         for url in self.extra_data.get('urls', []):
             if url.get('type') == 'pdf' or 'pdf' in url.get('url', ''):
