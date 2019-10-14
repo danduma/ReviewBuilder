@@ -215,6 +215,10 @@ class Paper:
         return self.abstract is not None and self.abstract
 
     @property
+    def has_valid_id(self):
+        return any([self.doi, self.pmid, self.arxivid, self.extra_data.get('ss_id')])
+
+    @property
     def has_pdf_link(self):
         for url in self.extra_data.get('urls', []):
             if url.get('type') == 'pdf' or 'pdf' in url.get('url', ''):
