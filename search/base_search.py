@@ -29,7 +29,7 @@ class SearchResult:
             self.bib.get("year", ""), str(self.bib))
 
 
-def getSearchResultsFromBib(bib_entries, max_results):
+def getSearchResultsFromBib(bib_entries, max_results=100000000):
     results = []
     for index, bib in enumerate(bib_entries[:max_results]):
         res = SearchResult(index, bib, 'bibfile', {})
