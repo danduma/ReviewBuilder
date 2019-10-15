@@ -136,11 +136,11 @@ def readBibtexString(bibstr):
     return bibtexparser.loads(bibstr).entries
 
 
-def read_bibtex_file(filename):
+def readBibtexFile(filename):
     return bibtexparser.load(open(filename, 'r')).entries
 
 
-def write_bibtex(results: list, filename: str):
+def writeBibtex(results: list, filename: str):
     """
     Exports the list of results to a BibTeX file.
 
