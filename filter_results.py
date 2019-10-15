@@ -1,12 +1,14 @@
 from db.data import PaperStore, Paper
 
 from argparse import ArgumentParser
-from db.bibtex import read_bibtex_file, parseBibAuthors, write_bibtex
+from db.bibtex import readBibtexFile, parseBibAuthors, writeBibtex
+from general_utils import loadEntriesAndSetUp
 from search import getSearchResultsFromBib
 
 import pandas as pd
 from langdetect import detect
 from langdetect import DetectorFactory
+
 DetectorFactory.seed = 0
 import re
 
@@ -73,11 +75,47 @@ def printReport(df):
     print('Excluded papers', len(df[df['excluded'] == True]))
     print('Excluded because of')
     print('  language', len(df[df['exclude_reason'] == 'language']))
+    print('  is a patent', len(df[df['exclude_reason'] == 'is_patent']))
+    print('  year out of range', len(df[df['exclude_reason'] == 'year']))
     print('  is a review', len(df[df['exclude_reason'] == 'is_review']))
     print('  using images', len(df[df['exclude_reason'] == 'uses_images']))
+    print('  full text not available', len(df[df['exclude_reason'] == 'no_pdf']))
     print('  not radiology', len(df[df['exclude_reason'] == 'not_radiology']))
     print('  not NLP', len(df[df['exclude_reason'] == 'not_nlp']))
-    print('  is a patent', len(df[df['exclude_reason'] == 'is_patent']))
+
+
+def collectStats(papers):
+    results = []
+    for paper in papers:
+        res = {
+            # 'id': paper.id,
+            'has_year': bool(paper.year),
+            'has_title': bool(paper.title),
+            # 'authors': paper.authors,
+            'has_doi': bool(paper.doi),
+            'has_arxivid': bool(paper.arxivid),
+            'has_pmid': bool(paper.pmid),
+            'has_ssid': bool(paper.extra_data.get('ss_id')),
+            'has_valid_id': paper.has_valid_id,
+            'has_abstract': paper.has_abstract,
+            'has_full_abstract': paper.has_full_abstract,
+            'has_pdf': paper.has_pdf_link
+        }
+        results.append(res)
+
+    df = pd.DataFrame(results)
+    for field in ['has_year',
+                  'has_title',
+                  'has_doi',
+                  'has_arxivid',
+                  'has_pmid',
+                  'has_ssid',
+                  'has_valid_id',
+                  'has_abstract',
+                  'has_full_abstract',
+                  'has_pdf']:
+        print(field, len(df[df[field] == True]))
+    print()
 
 
 def filterPapers(papers):
@@ -107,10 +145,10 @@ def filterPapers(papers):
             else:
                 language = detect(text)
 
-            if language != 'en':
-                print(text)
-                print("Lang:", language)
-                print()
+            # if language != 'en':
+            #     print(text)
+            #     print("Lang:", language)
+            #     print()
 
         language = language.lower()
         record['language'] = language
@@ -121,6 +159,10 @@ def filterPapers(papers):
             record['excluded'] = True
             record['exclude_reason'] = 'language'
             accept = False
+        elif url and 'patent' in url.lower():
+            record['excluded'] = True
+            record['exclude_reason'] = 'is_patent'
+            accept = False
         elif int(paper.bib.get('year', 0)) < 2015:
             record['excluded'] = True
             record['exclude_reason'] = 'year'
@@ -129,11 +171,15 @@ def filterPapers(papers):
             record['excluded'] = True
             record['exclude_reason'] = 'is_review'
             accept = False
-        elif oneKeywordInText(['image', 'visual', 'chest x-ray'], lower_text):
+        elif oneKeywordInText(['images', 'visual', 'chest x-ray'], lower_text):
             record['excluded'] = True
             record['exclude_reason'] = 'uses_images'
             accept = False
-        elif oneKeywordNotInText(['radiolo'], lower_text):
+        elif not paper.has_pdf:
+            record['excluded'] = True
+            record['exclude_reason'] = 'no_pdf'
+            accept = False
+        elif allKeywordsNotInText(['radiolo', 'imaging report', 'scan report', 'CT', 'MRI'], lower_text):
             record['excluded'] = True
             record['exclude_reason'] = 'not_radiology'
             accept = False
@@ -143,10 +189,6 @@ def filterPapers(papers):
                 lower_text):
             record['excluded'] = True
             record['exclude_reason'] = 'not_nlp'
-            accept = False
-        elif url and 'patent' in url.lower():
-            record['excluded'] = True
-            record['exclude_reason'] = 'is_patent'
             accept = False
 
         if accept:
@@ -158,31 +200,15 @@ def filterPapers(papers):
 
 
 def main(conf):
-    if conf.cache:
-        paperstore = PaperStore()
-    else:
-        paperstore = None
+    paperstore, papers_to_add, papers_existing, all_papers = loadEntriesAndSetUp(conf.input, conf.cache, conf.max)
 
-    bib_entries = read_bibtex_file(conf.input)
-    results = getSearchResultsFromBib(bib_entries)
-
-    if paperstore:
-        found, missing = paperstore.matchResultsWithPapers(results)
-    else:
-        found = []
-        missing = results
-
-    papers_missing = [Paper(res.bib, res.extra_data) for res in missing]
-    papers_found = [res.paper for res in found]
-
-    all_papers = papers_found + papers_missing
-
+    collectStats(all_papers)
     included, df = filterPapers(all_papers)
 
     printReport(df)
 
     df.to_csv(conf.report_path)
-    write_bibtex(included, conf.output)
+    writeBibtex(included, conf.output)
 
 
 if __name__ == '__main__':
