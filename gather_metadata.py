@@ -1,38 +1,21 @@
-from db.data import PaperStore, Paper
+from general_utils import loadEntriesAndSetUp
 
 from search import enrichAndUpdateMetadata
 from argparse import ArgumentParser
-from db.bibtex import write_bibtex, read_bibtex_file
+from db.bibtex import writeBibtex
 
-from search.base_search import getSearchResultsFromBib
 
 def main(conf):
-    if conf.cache:
-        paperstore = PaperStore()
-    else:
-        paperstore = None
-
-    bib_entries = read_bibtex_file(conf.input)
-    results = getSearchResultsFromBib(bib_entries, conf.max)
-
-    if paperstore:
-        found, missing = paperstore.matchResultsWithPapers(results)
-    else:
-        found = []
-        missing = results
-
-    papers_to_add = [Paper(res.bib, res.extra_data) for res in missing]
+    paperstore, papers_to_add, papers_existing, all_papers = loadEntriesAndSetUp(conf.input, conf.cache, conf.max)
 
     if conf.cache:
         successful, unsuccessful = enrichAndUpdateMetadata(papers_to_add, paperstore, conf.email)
-
-    papers_existing = [res.paper for res in found]
 
     if conf.force and conf.cache:
         enrichAndUpdateMetadata(papers_existing, paperstore, conf.email)
 
     all_papers = papers_to_add + papers_existing
-    write_bibtex(all_papers, conf.output)
+    writeBibtex(all_papers, conf.output)
 
 
 if __name__ == '__main__':
