@@ -138,22 +138,34 @@ class NiceScraper:
         :param headers: headers to pass
         :return: request object
         """
-        self.playNice()
+        class_name=self.__class__.__name__.split('.')[-1]
+        status_code = 0
+        retries = 0
 
-        self.request_times.append(datetime.datetime.now())
-        before = datetime.datetime.now()
+        while status_code != 200 and retries < 2:
+            self.playNice()
 
-        if post:
-            r = requests.post(url, json=data, headers=headers)
-        else:
-            r = requests.get(url, headers=headers)
+            self.request_times.append(datetime.datetime.now())
+            before = datetime.datetime.now()
+
+            if post:
+                r = requests.post(url, json=data, headers=headers)
+            else:
+                r = requests.get(url, headers=headers)
+
+            if r.status_code == 429:
+                print(class_name,': Status code 429: waiting and retrying')
+                sleep(30)
+
+            status_code = r.status_code
+            retries += 1
 
         duration = datetime.datetime.now() - before
 
         self.setRateLimitsFromHeaders(r)
 
         self.response_times.append(duration.total_seconds())
-        print(self.__class__.__name__.split('.')[-1], "request took", self.response_times[-1])
+        print(class_name, "request took", self.response_times[-1])
 
         return r
 
@@ -604,7 +616,7 @@ class SemanticScholarScraper(NiceScraper):
             return []
 
         return_results = []
-        for res in results[:max_results]:
+        for index, res in enumerate(results[:max_results]):
 
             res_title = res['title']['text']
 
@@ -617,7 +629,7 @@ class SemanticScholarScraper(NiceScraper):
             authors = self.loadSSAuthors(authors_processed)
 
             bib = {'title': res_title,
-                   'abstract': res['paperAbstract'],
+                   'abstract': res['paperAbstract']['text'],
                    'year': res['year']['text'],
                    'url': 'https://www.semanticscholar.org/paper/{}/{}'.format(res['slug'],
                                                                                res['id']),
@@ -632,7 +644,7 @@ class SemanticScholarScraper(NiceScraper):
                 'x_authors': authors
             }
 
-            new_res = SearchResult(bib, extra_data)
+            new_res = SearchResult(index, bib, 'semantischolar', extra_data)
 
             for link in res.get('links', []):
                 if isPDFURL(link['url']):
@@ -640,6 +652,7 @@ class SemanticScholarScraper(NiceScraper):
                     addUrlIfNew(new_res, link['url'], 'pdf', 'semanticscholar')
 
             venue = res['venue'].get('text')
+            extra_data['venue'] = venue
             return_results.append(new_res)
         return return_results
 
@@ -723,7 +736,7 @@ def enrichMetadata(paper: Paper, identity):
             new_bib = getBibtextFromDOI(paper.doi)
             paper = mergeResultData(paper,
                                     SearchResult(1, new_bib[0], 'crossref', paper.extra_data))
-            paper.extra_data['done_crossref'] = True
+        paper.extra_data['done_crossref'] = True
 
     # if we have a DOI and we haven't got the abstract yet
     if paper.doi and not paper.extra_data.get('done_semanticscholar'):
@@ -735,18 +748,18 @@ def enrichMetadata(paper: Paper, identity):
         # if (not paper.doi or not paper.has_full_abstract) and not paper.pmid and not paper.extra_data.get('done_pubmed'):
         if pubmed_scraper.matchPaperFromResults(paper, identity, ok_title_distance=0.4):
             pubmed_scraper.enrichWithMetadata(paper)
-            paper.extra_data['done_pubmed'] = True
+        paper.extra_data['done_pubmed'] = True
 
     # still no DOI? maybe we can get something from SemanticScholar
     if not paper.extra_data.get('ss_id') and not paper.extra_data.get('done_semanticscholar'):
-        if semanticscholarmetadata.matchPaperFromResults(paper, identity):
-            paper.extra_data['done_semanticscholar'] = True
+        semanticscholarmetadata.matchPaperFromResults(paper, identity)
+        paper.extra_data['done_semanticscholar'] = True
 
     # if we don't have an abstract maybe it's on arXiv
     if not paper.has_full_abstract and not paper.extra_data.get('done_arxiv'):
         # if not paper.extra_data.get('done_arxiv'):
-        if arxiv_scraper.matchPaperFromResults(paper, identity, ok_title_distance=0.35):
-            paper.extra_data['done_arxiv'] = True
+        arxiv_scraper.matchPaperFromResults(paper, identity, ok_title_distance=0.35)
+        paper.extra_data['done_arxiv'] = True
 
     # try to get open access links if DOI present and missing PDF link
     if not paper.has_pdf_link and paper.doi and not paper.extra_data.get('done_unpaywall'):
