@@ -1,7 +1,6 @@
-from db.data import PaperStore, Paper
 from argparse import ArgumentParser
-from db.bibtex import read_bibtex_file, isPDFURL, parseBibAuthors
-from search import getSearchResultsFromBib
+from db.bibtex import isPDFURL, parseBibAuthors
+from general_utils import loadEntriesAndSetUp
 
 from multiprocessing.pool import ThreadPool
 import os
@@ -60,7 +59,8 @@ def bulkDownload(papers, root_dir, report_path):
             print("missing year", paper)
         task_record = {'id': paper.id,
                        'doi': paper.doi,
-                       'filename': os.path.join(root_dir, generateFilename(paper)) + '.pdf'
+                       'filename': os.path.join(root_dir, generateFilename(paper)) + '.pdf',
+                       'abstract': paper.abstract
                        }
         url = None
         url_source = None
@@ -101,24 +101,7 @@ def bulkDownload(papers, root_dir, report_path):
 
 
 def main(conf):
-    if conf.cache:
-        paperstore = PaperStore()
-    else:
-        paperstore = None
-
-    bib_entries = read_bibtex_file(conf.input)
-    results = getSearchResultsFromBib(bib_entries, conf.max)
-
-    if paperstore:
-        found, missing = paperstore.matchResultsWithPapers(results)
-    else:
-        found = []
-        missing = results
-
-    papers_missing = [Paper(res.bib, res.extra_data) for res in missing]
-    papers_found = [res.paper for res in found]
-
-    all_papers = papers_found + papers_missing
+    paperstore, papers_to_add, papers_existing, all_papers = loadEntriesAndSetUp(conf.input, conf.cache, conf.max)
 
     bulkDownload(all_papers, conf.dir, conf.report_path)
 
