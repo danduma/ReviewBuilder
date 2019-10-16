@@ -5,7 +5,7 @@ from .base_search import Searcher, MAX_RESULTS, SearchResult
 import bibtexparser
 from tqdm import tqdm
 from random import random
-from db.bibtex import fixBibData, getDOIfromURL, addUrlIfNew, isPDFURL
+from db.bibtex import fixBibData, getDOIfromURL, addUrlIfNew, isPDFURL, addUrlIfNewWithType
 
 
 class GScholarSearcher(Searcher):
@@ -45,10 +45,7 @@ class GScholarSearcher(Searcher):
                 if hasattr(result, field):
                     bib[field] = getattr(result, field)
 
-                    if isPDFURL(result.url):
-                        addUrlIfNew(result, result.url, 'pdf', 'scholar')
-                    else:
-                        addUrlIfNew(result, result.url, 'main', 'scholar')
+                    addUrlIfNewWithType(result, result.url, 'scholar')
 
             doi = getDOIfromURL(bib.get('url'))
             if not doi:
