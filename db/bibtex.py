@@ -17,7 +17,7 @@ def fixBibData(bib, index):
     """
     if "ENTRYTYPE" not in bib:
         bib["ENTRYTYPE"] = "ARTICLE"
-    if "ID" not in bib or bib.get('year'):
+    if "ID" not in bib:
         authors = parseBibAuthors(bib["author"])
         if not authors:
             bib['ID'] = 'id' + str(random.randint(1000, 9000))
