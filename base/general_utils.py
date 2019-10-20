@@ -1,6 +1,7 @@
 from db.bibtex import readBibtexFile
 from db.data import PaperStore, Paper
 from search import getSearchResultsFromBib
+from db.ref_utils import simpleResultDeDupe
 
 
 def loadEntriesAndSetUp(input, use_cache=True, max_results=10000000):
@@ -12,6 +13,8 @@ def loadEntriesAndSetUp(input, use_cache=True, max_results=10000000):
     bib_entries = readBibtexFile(input)
     results = getSearchResultsFromBib(bib_entries, max_results)
 
+    results = simpleResultDeDupe(results)
+
     if paperstore:
         found, missing = paperstore.matchResultsWithPapers(results)
     else:
@@ -22,5 +25,9 @@ def loadEntriesAndSetUp(input, use_cache=True, max_results=10000000):
     papers_existing = [res.paper for res in found]
 
     all_papers = papers_to_add + papers_existing
+
+    # FIXME: a second dedupe is needed because it seems I'm matching the wrong paper
+    # a total of 5 records suffer from this so it's no big deal
+    all_papers = simpleResultDeDupe(all_papers)
 
     return paperstore, papers_to_add, papers_existing, all_papers
