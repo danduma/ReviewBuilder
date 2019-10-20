@@ -2,7 +2,6 @@ import sqlite3
 import os, re, json
 import pandas as pd
 import bibtexparser
-import unicodedata
 
 from strsimpy import NormalizedLevenshtein
 
@@ -16,7 +15,8 @@ stopwords = set(["i", "me", "my", "myself", "we", "our", "ours", "ourselves", "y
                  "in", "out", "on", "off", "over", "under", "again", "further", "then", "once", "here", "there",
                  "when", "where", "so", "than", "too", "very", "s", "t", "can", "will", "just", "don", "should", "now"])
 
-from db.bibtex import parseBibAuthors
+from db.bibtex import generateUniqueID
+from db.ref_utils import parseBibAuthors, normalizeTitle
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -33,55 +33,6 @@ CACHE_FILE = os.path.join(current_dir, "papers.sqlite")
 #     doi = Column(String, unique=True)
 #     pmid = Column(String, unique=True)
 #     scholarid = Column(String, unique=True)
-
-def unicodeToASCII(input_str):
-    nfkd_form = unicodedata.normalize('NFKD', input_str)
-    only_ascii = nfkd_form.encode('ASCII', 'ignore').decode("utf-8")
-    return only_ascii
-
-
-def normalizeTitle(title):
-    """
-        Returns a "normalized" title for easy matching
-    """
-    title = title.lower()
-    title = re.sub(r"–", " ", title)
-    title = unicodeToASCII(title)
-    title = title.replace("-  ", "").replace("- ", "")
-    title = re.sub(r"[\"\#\$\%\&\\\'\(\)\*\+\,\-\.\/\:\;\<\=\>\?\¿\!\¡\@\[\]\^\_\`\{\|\}\~]", " ", title)
-    title = re.sub(r"\s+", " ", title)
-    title = title.strip()
-    title = title[:200]
-    return title
-
-
-def generateUniqueID(paper):
-    """
-    Returns a simple string id that is the mashup of the title and authors
-
-    :param paper:
-    :return:
-    """
-    author_bit = ''
-    if paper.extra_data.get('xref_author'):
-        authors = paper.extra_data['xref_author']
-    else:
-        try:
-            authors = parseBibAuthors(paper.authors)
-        except:
-            print("Failed to parse authors string", paper.authors)
-            authors = [{'given': '', 'family': ''}]
-
-    for author in authors:
-        if author.get('family'):
-            author_bit += author.get('family', '_')[0] + author.get('given', '_')[0]
-
-    title_bit = normalizeTitle(paper.title)
-    title_bit = re.sub("\s+", "", title_bit)
-    full_id = title_bit + "_" + author_bit
-    full_id = full_id.lower()
-    return full_id
-
 
 class Paper:
     """
@@ -432,6 +383,7 @@ class PaperStore:
         self.createVirtualTable()
         for result in results:
             paper = Paper(result.bib, result.extra_data)
+
             paper_found = False
             for id_type in ["doi", "pmid", "arxivid", "scholarid"]:
                 id_string = getattr(paper, id_type)
@@ -443,14 +395,14 @@ class PaperStore:
                         paper_found = True
                         break
 
-            if not paper_found:
+            if not paper_found and paper.title:
                 paper_records = self.findPapersByTitle(paper.title)
                 if paper_records:
                     result.paper = paper_records[0]
                     found.append(result)
                     paper_found = True
 
-                if not paper_found:
+                if not paper_found and paper.title:
                     paper_record = self.findPaperByApproximateTitle(paper)
                     if paper_record:
                         result.paper = paper_record

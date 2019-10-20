@@ -1,4 +1,4 @@
-from general_utils import loadEntriesAndSetUp
+from base.general_utils import loadEntriesAndSetUp
 
 from search import enrichAndUpdateMetadata
 from argparse import ArgumentParser

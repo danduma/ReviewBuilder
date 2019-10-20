@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 from db.data import PaperStore, Paper
 from db.endnote_html import loadRefsFromHTML
 from search import getSearchResultsFromBib
-from db.bibtex import addUrlIfNewWithType
+from db.ref_utils import addUrlIfNewWithType
 
 
 def main(conf):

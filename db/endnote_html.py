@@ -1,5 +1,5 @@
 import re
-from .bibtex import isPDFURL
+from db.ref_utils import isPDFURL
 
 mapping = [
     # ('Reference Type: ', 'ENTRYTYPE'),

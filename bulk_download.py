@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
-from db.bibtex import isPDFURL, parseBibAuthors
-from general_utils import loadEntriesAndSetUp
+from db.ref_utils import isPDFURL, parseBibAuthors
+from base.general_utils import loadEntriesAndSetUp
 
 from multiprocessing.pool import ThreadPool
 import os

@@ -2,7 +2,7 @@ from db.data import PaperStore, Paper
 
 from search import GScholarSearcher, enrichAndUpdateMetadata
 from argparse import ArgumentParser
-from db.bibtex import write_bibtex
+from db.bibtex import writeBibtex
 
 
 def main(conf):
@@ -14,7 +14,7 @@ def main(conf):
     if conf.engine == "scholar":
         searcher = GScholarSearcher(paperstore)
     # elif conf.engine == "pubmed":
-    #     searcher = GScholarSearcher(paperstore)
+    #     searcher = PubMedSearcher(paperstore)
     else:
         raise ValueError
 
@@ -34,7 +34,7 @@ def main(conf):
         papers_to_add = [Paper(res.bib, res.extra_data) for res in missing]
         paperstore.updatePapers(papers_to_add)
 
-    write_bibtex([Paper(res.bib, res.extra_data) for res in results], conf.file)
+    writeBibtex([Paper(res.bib, res.extra_data) for res in results], conf.file)
 
 
 if __name__ == '__main__':
