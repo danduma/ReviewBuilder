@@ -123,21 +123,26 @@ def addUrlIfNewWithType(paper, url: str, source: str):
     return addUrlIfNew(paper, url, type, source)
 
 
-def simpleBibDeDupe(entries):
+def simpleResultDeDupe(results):
     from collections import OrderedDict
 
+    duplicates = []
+
     unique_entries = OrderedDict()
-    for entry in entries:
-        if entry['ID'] in unique_entries:
-            if normalizeTitle(entry['title']) == normalizeTitle(unique_entries[entry['ID']]):
-                print(unique_entries[entry['ID']], '\n\n', entry, '\n---------------')
+    for result in results:
+
+        if result.bib['ID'] in unique_entries:
+            if normalizeTitle(result.bib['title']) == normalizeTitle(unique_entries[result.bib['ID']].bib['title']):
+                # print(unique_entries[result.bib['ID']], '\n\n', result.bib, '\n---------------')
+                duplicates.append(result)
                 continue
             else:
-                entry['ID'] += "_"
+                result.bib['ID'] += "_2"
 
-        unique_entries[entry['ID']] = entry
+        unique_entries[result.bib['ID']] = result
 
-    return unique_entries.values()
+    print('Duplicates found:', len(duplicates))
+    return [v for k, v in unique_entries.items()]
 
 
 def normalizeTitle(title):
