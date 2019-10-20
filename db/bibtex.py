@@ -130,7 +130,16 @@ def addUrlIfNew(paper, url: str, type: str, source: str):
         paper.extra_data['urls'].append({'url': norm_url,
                                          'type': type,
                                          'source': source})
+        return True
+    return False
 
+def addUrlIfNewWithType(paper, url: str, source: str):
+    if isPDFURL(url):
+        type='pdf'
+    else:
+        type='main'
+
+    return addUrlIfNew(paper, url, type, source)
 
 def readBibtexString(bibstr):
     return bibtexparser.loads(bibstr).entries
