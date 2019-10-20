@@ -1,4 +1,4 @@
-from .bibtex import parseBibAuthors
+from db.ref_utils import parseBibAuthors
 
 mapping = [
     ('address', 'AD'),
@@ -40,7 +40,7 @@ def exportBibToRIS(entries):
             lines.append(au_line)
 
         # lines.append('PY - %s/%s/%s/' % (entry['year'], entry['month'], entry['day']))
-        lines.append('PY - %s///' % (entry['year'],))
+        lines.append('PY - %s///' % (entry.get('year',''),))
 
         pages = entry.get('pages')
         if pages:
@@ -59,6 +59,10 @@ def exportBibToRIS(entries):
 
 
 def writeBibToRISFile(entries, filename):
-    with open(filename) as f:
+    with open(filename, 'w') as f:
         text = exportBibToRIS(entries)
         f.write(text)
+
+def writeRIS(papers, filename):
+    bibs = [paper.bib for paper in papers]
+    writeBibToRISFile(bibs, filename)
