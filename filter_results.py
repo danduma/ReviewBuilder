@@ -1,9 +1,6 @@
-from db.data import PaperStore, Paper
-
 from argparse import ArgumentParser
-from db.bibtex import readBibtexFile, parseBibAuthors, writeBibtex
-from general_utils import loadEntriesAndSetUp
-from search import getSearchResultsFromBib
+from db.bibtex import writeBibtex
+from base.general_utils import loadEntriesAndSetUp
 
 import pandas as pd
 from langdetect import detect
@@ -24,6 +21,10 @@ def getPaperText(paper):
         res += " " + abstract
     return res
 
+
+def isPatent(paper):
+    url = paper.bib.get('url', paper.bib.get('eprint'))
+    return 'patent' in paper.bib.get('journal','') or (url and 'patent' in url.lower())
 
 def oneKeywordInText(keywords, text):
     text_lower = text.lower()
@@ -99,21 +100,13 @@ def collectStats(papers):
             'has_valid_id': paper.has_valid_id,
             'has_abstract': paper.has_abstract,
             'has_full_abstract': paper.has_full_abstract,
-            'has_pdf': paper.has_pdf_link
+            'has_pdf': paper.has_pdf_link,
+            'not_abstract_but_pdf': not paper.has_abstract and paper.has_pdf
         }
         results.append(res)
 
     df = pd.DataFrame(results)
-    for field in ['has_year',
-                  'has_title',
-                  'has_doi',
-                  'has_arxivid',
-                  'has_pmid',
-                  'has_ssid',
-                  'has_valid_id',
-                  'has_abstract',
-                  'has_full_abstract',
-                  'has_pdf']:
+    for field in df.columns:
         print(field, len(df[df[field] == True]))
     print()
 
@@ -137,7 +130,7 @@ def filterPapers(papers):
 
         text = getPaperText(paper)
         language = paper.extra_data.get('language')
-        url = paper.bib.get('url', paper.bib.get('eprint'))
+
 
         if not language:
             if len(text) < 62 or text.isupper():
@@ -159,7 +152,7 @@ def filterPapers(papers):
             record['excluded'] = True
             record['exclude_reason'] = 'language'
             accept = False
-        elif url and 'patent' in url.lower():
+        elif isPatent(paper):
             record['excluded'] = True
             record['exclude_reason'] = 'is_patent'
             accept = False
@@ -200,7 +193,7 @@ def filterPapers(papers):
 
 
 def main(conf):
-    paperstore, papers_to_add, papers_existing, all_papers = loadEntriesAndSetUp(conf.input, conf.cache, conf.max)
+    paperstore, papers_to_add, papers_existing, all_papers = loadEntriesAndSetUp(conf.input, conf.cache)
 
     collectStats(all_papers)
     included, df = filterPapers(all_papers)
