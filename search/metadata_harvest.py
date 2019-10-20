@@ -5,8 +5,8 @@ warnings.filterwarnings("ignore")
 import requests
 import re, json
 import urllib.parse
-from db.bibtex import readBibtexString, authorListFromDict, fixBibData, getDOIfromURL, addUrlIfNew, \
-    isPDFURL, getBibtextFromDOI
+from db.bibtex import readBibtexString, fixBibData, getBibtextFromDOI
+from db.ref_utils import isPDFURL, getDOIfromURL, authorListFromDict, addUrlIfNew
 from db.data import Paper, computeAuthorDistance, rerankByTitleSimilarity, basicTitleCleaning, dist, removeListWrapper
 from .base_search import SearchResult
 from tqdm import tqdm
@@ -754,6 +754,11 @@ def enrichMetadata(paper: Paper, identity):
     if not paper.extra_data.get('ss_id') and not paper.extra_data.get('done_semanticscholar'):
         semanticscholarmetadata.matchPaperFromResults(paper, identity)
         paper.extra_data['done_semanticscholar'] = True
+
+    # # time to try Scopus, see if it's behind a paywall
+    # if not paper.doi and not paper.extra_data.get('done_scopus'):
+    #     semanticscholarmetadata.getMetadata(paper)
+    #     paper.extra_data['done_semanticscholar'] = True
 
     # if we don't have an abstract maybe it's on arXiv
     if not paper.has_full_abstract and not paper.extra_data.get('done_arxiv'):
