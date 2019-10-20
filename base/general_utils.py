@@ -1,11 +1,10 @@
 from db.bibtex import readBibtexFile
 from db.data import PaperStore, Paper
-from export_to_ris import conf
 from search import getSearchResultsFromBib
 
 
-def loadEntriesAndSetUp(input, use_cache, max_results):
-    if conf.cache:
+def loadEntriesAndSetUp(input, use_cache=True, max_results=10000000):
+    if use_cache:
         paperstore = PaperStore()
     else:
         paperstore = None
