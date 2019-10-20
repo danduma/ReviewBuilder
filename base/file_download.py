@@ -45,7 +45,7 @@ def generateFilename(paper):
     return res
 
 
-def bulkDownload(papers, root_dir, report_path):
+def bulkDownload(papers, root_dir, report_path, do_not_download_just_list=False):
     root_dir = os.path.abspath(root_dir)
 
     if not os.path.exists(root_dir):
@@ -56,9 +56,13 @@ def bulkDownload(papers, root_dir, report_path):
     for paper in papers:
         if not paper.year:
             print("missing year", paper)
+
+        filename = os.path.join(root_dir, generateFilename(paper)) + '.pdf'
+        paper.pdf_filename = filename
+
         task_record = {'id': paper.id,
                        'doi': paper.doi,
-                       'filename': os.path.join(root_dir, generateFilename(paper)) + '.pdf',
+                       'filename': filename,
                        'abstract': paper.abstract
                        }
         url = None
@@ -87,11 +91,11 @@ def bulkDownload(papers, root_dir, report_path):
             print(paper.bib)
             print()
 
-
     df = pd.DataFrame(download_tasks)
     df.to_csv('download_tasks.csv')
 
-    return
+    if do_not_download_just_list:
+        return
 
     results = ThreadPool(8).imap_unordered(fetch_url, download_tasks)
 
