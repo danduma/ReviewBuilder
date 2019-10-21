@@ -1,7 +1,7 @@
 from argparse import ArgumentParser
 from db.bibtex import writeBibtex
+from db.ris import writeRIS
 from base.general_utils import loadEntriesAndSetUp
-
 import pandas as pd
 from langdetect import detect
 from langdetect import DetectorFactory
@@ -24,7 +24,8 @@ def getPaperText(paper):
 
 def isPatent(paper):
     url = paper.bib.get('url', paper.bib.get('eprint'))
-    return 'patent' in paper.bib.get('journal','') or (url and 'patent' in url.lower())
+    return 'patent' in paper.bib.get('journal', '') or (url and 'patent' in url.lower())
+
 
 def oneKeywordInText(keywords, text):
     text_lower = text.lower()
@@ -131,7 +132,6 @@ def filterPapers(papers):
         text = getPaperText(paper)
         language = paper.extra_data.get('language')
 
-
         if not language:
             if len(text) < 62 or text.isupper():
                 language = 'en'
@@ -148,6 +148,9 @@ def filterPapers(papers):
 
         lower_text = text.lower()
 
+        if paper.title == "Identifying peripheral arterial disease cases using natural language processing of clinical notes":
+            print()
+
         if not language.startswith('en'):
             record['excluded'] = True
             record['exclude_reason'] = 'language'
@@ -160,11 +163,11 @@ def filterPapers(papers):
             record['excluded'] = True
             record['exclude_reason'] = 'year'
             accept = False
-        elif 'review' in paper.title.lower():
+        elif oneKeywordInText(['review', 'overview'], paper.title.lower()) or oneKeywordInText(['this review', 'this chapter'], lower_text):
             record['excluded'] = True
             record['exclude_reason'] = 'is_review'
             accept = False
-        elif oneKeywordInText(['images', 'visual', 'chest x-ray'], lower_text):
+        elif oneKeywordInText(['images', 'visual', 'chest x-ray', 'segmentation'], lower_text):
             record['excluded'] = True
             record['exclude_reason'] = 'uses_images'
             accept = False
@@ -172,13 +175,15 @@ def filterPapers(papers):
             record['excluded'] = True
             record['exclude_reason'] = 'no_pdf'
             accept = False
-        elif allKeywordsNotInText(['radiolo', 'imaging report', 'scan report', 'CT', 'MRI'], lower_text):
+        elif allKeywordsNotInText(['radiolo', 'imaging report', ' CT', ',CT', ':CT', 'MRI'], lower_text):
             record['excluded'] = True
             record['exclude_reason'] = 'not_radiology'
             accept = False
         elif allKeywordsNotInText(
-                ['text', 'langu', 'lingu', 'nlp', 'synta', 'embedding', 'information extraction', 'deep learning',
-                 'deep neural', 'machine learning', 'artificial intelligence', 'document classification', 'supervised'],
+                ['text', 'langu', 'lingu', 'nlp', 'synta', 'embedding', 'information extraction',
+                 'text mining', 'words',
+                 'deep learning', 'deep neural',
+                 'machine learning', 'artificial intelligence', 'document classification', ],
                 lower_text):
             record['excluded'] = True
             record['exclude_reason'] = 'not_nlp'
@@ -201,7 +206,11 @@ def main(conf):
     printReport(df)
 
     df.to_csv(conf.report_path)
-    writeBibtex(included, conf.output)
+
+    if conf.output.endswith('.ris'):
+        writeRIS(included, conf.output)
+    else:
+        writeBibtex(included, conf.output)
 
 
 if __name__ == '__main__':
