@@ -7,7 +7,7 @@ from base.general_utils import loadEntriesAndSetUp
 def main(conf):
     paperstore, papers_to_add, papers_existing, all_papers = loadEntriesAndSetUp(conf.input, conf.cache, conf.max)
 
-    bulkDownload(all_papers, conf.dir, conf.report_path)
+    bulkDownload(all_papers, conf.dir, conf.report_path, do_not_download_just_list=False)
 
 
 if __name__ == '__main__':
