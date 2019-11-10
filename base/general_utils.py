@@ -4,7 +4,7 @@ from search import getSearchResultsFromBib
 from db.ref_utils import simpleResultDeDupe
 from db.bibtex import writeBibtex
 from db.ris import writeRIS
-
+from db.csv import readCSVFile
 
 def loadEntriesAndSetUp(input, use_cache=True, max_results=10000000):
     if use_cache:
@@ -12,7 +12,7 @@ def loadEntriesAndSetUp(input, use_cache=True, max_results=10000000):
     else:
         paperstore = None
 
-    bib_entries = readBibtexFile(input)
+    bib_entries = readInputBib(input)
     results = getSearchResultsFromBib(bib_entries, max_results)
 
     results = simpleResultDeDupe(results)
@@ -33,6 +33,14 @@ def loadEntriesAndSetUp(input, use_cache=True, max_results=10000000):
     all_papers = simpleResultDeDupe(all_papers)
 
     return paperstore, papers_to_add, papers_existing, all_papers
+
+def readInputBib(filename):
+    if filename.endswith('.bib'):
+        return readBibtexFile(filename)
+    elif filename.endswith('.csv'):
+        return readCSVFile(filename)
+    elif filename.endswith('.ris'):
+        raise NotImplementedError
 
 def writeOutputBib(bib, filename):
     if filename.endswith('.ris'):
