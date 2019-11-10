@@ -40,8 +40,8 @@ def exportBibToRIS(entries):
                 au_line += ' ' + author['middle']
             lines.append(au_line)
 
-        # lines.append('PY - %s/%s/%s/' % (entry['year'], entry['month'], entry['day']))
-        lines.append('Y1 - %s' % (entry.get('year',''),))
+        # lines.append('PY  - %s/%s/%s/' % (entry['year'], entry['month'], entry['day']))
+        lines.append('PY  - %s' % (entry.get('year',''),))
 
         pages = entry.get('pages')
         if pages:
