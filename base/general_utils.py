@@ -2,6 +2,8 @@ from db.bibtex import readBibtexFile
 from db.data import PaperStore, Paper
 from search import getSearchResultsFromBib
 from db.ref_utils import simpleResultDeDupe
+from db.bibtex import writeBibtex
+from db.ris import writeRIS
 
 
 def loadEntriesAndSetUp(input, use_cache=True, max_results=10000000):
@@ -31,3 +33,9 @@ def loadEntriesAndSetUp(input, use_cache=True, max_results=10000000):
     all_papers = simpleResultDeDupe(all_papers)
 
     return paperstore, papers_to_add, papers_existing, all_papers
+
+def writeOutputBib(bib, filename):
+    if filename.endswith('.ris'):
+        writeRIS(bib, filename)
+    else:
+        writeBibtex(bib, filename)

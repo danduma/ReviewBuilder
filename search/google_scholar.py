@@ -5,7 +5,8 @@ from .base_search import Searcher, MAX_RESULTS, SearchResult
 import bibtexparser
 from tqdm import tqdm
 from random import random
-from db.bibtex import fixBibData, getDOIfromURL, addUrlIfNew, isPDFURL, addUrlIfNewWithType
+from db.bibtex import fixBibData
+from db.ref_utils import isPDFURL, getDOIfromURL, addUrlIfNew, addUrlIfNewWithType
 
 
 class GScholarSearcher(Searcher):

@@ -1,7 +1,5 @@
 from argparse import ArgumentParser
-from db.bibtex import writeBibtex
-from db.ris import writeRIS
-from base.general_utils import loadEntriesAndSetUp
+from base.general_utils import loadEntriesAndSetUp, writeOutputBib
 import pandas as pd
 from langdetect import detect
 from langdetect import DetectorFactory
@@ -207,11 +205,7 @@ def main(conf):
 
     df.to_csv(conf.report_path)
 
-    if conf.output.endswith('.ris'):
-        writeRIS(included, conf.output)
-    else:
-        writeBibtex(included, conf.output)
-
+    writeOutputBib(included, conf.output)
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Filter results ')
