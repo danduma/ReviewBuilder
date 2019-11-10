@@ -14,13 +14,17 @@ def fetch_url(entry):
 
     if not os.path.exists(entry['filename']):
         print("Get %s - %s" % (entry['id'][:30], entry['url']))
-        r = requests.get(entry['url'], stream=True)
-        if r.status_code == 200:
-            with open(entry['filename'], 'wb') as f:
-                for chunk in r:
-                    f.write(chunk)
+        try:
+            r = requests.get(entry['url'], stream=True)
+            result['return_code'] = r.status_code
+            if r.status_code == 200:
+                with open(entry['filename'], 'wb') as f:
+                    for chunk in r:
+                        f.write(chunk)
+        except Exception as e:
+            print(e.__class__.__name__, e)
+            result['return_code'] = 'TooManyRedirects'
 
-        result['return_code'] = r.status_code
     else:
         result['file_exists'] = True
 
@@ -54,8 +58,8 @@ def bulkDownload(papers, root_dir, report_path, do_not_download_just_list=False)
     download_tasks = []
 
     for paper in papers:
-        if not paper.year:
-            print("missing year", paper)
+        # if not paper.year:
+        #     print("missing year", paper)
 
         filename = os.path.join(root_dir, generateFilename(paper)) + '.pdf'
         paper.pdf_filename = filename
