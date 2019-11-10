@@ -52,10 +52,10 @@ def loadRayyan(filename):
         reviewer_column_title = 'reviewer_' + reviewer
         reviewer_titles.append('reviewer_' + reviewer)
         reviewer_column_data = [r.get(reviewer) for r in column_reviewers]
-        df.insert(10, reviewer_column_title, reviewer_column_data)
+        df.insert(len(df.columns), reviewer_column_title, reviewer_column_data)
 
-    df.insert(11, 'exclusion_reasons', column_exclusion_reasons)
-    df.insert(12, 'labels', column_labels)
+    df.insert(len(df.columns), 'exclusion_reasons', column_exclusion_reasons)
+    df.insert(len(df.columns), 'labels', column_labels)
 
     included_counts = []
 
@@ -66,7 +66,7 @@ def loadRayyan(filename):
                 included_count += 1
         included_counts.append(included_count)
 
-    df.insert(13, 'included_count', included_counts)
+    df.insert(len(df.columns), 'included_count', included_counts)
 
     return df
 
@@ -111,8 +111,8 @@ def computeReviewerOverlap(df):
     reviewer_columns = [c for c in df.columns if c.startswith('reviewer_')]
     df = df[reviewer_columns]
 
-    df['reviewer_agrivas'][df['reviewer_agrivas'] == 'Maybe'] = 'Included'
-    df['reviewer_Daniel'][df['reviewer_Daniel'] == 'Maybe'] = 'Included'
+    # df.loc[df['reviewer_agrivas'] == 'Maybe', 'reviewer_agrivas'] = 'Included'
+    # df.loc[df['reviewer_Daniel'] == 'Maybe', 'reviewer_Daniel'] = 'Included'
 
     res_df = computeOverlap(df)
     print('Total overlap')
@@ -126,14 +126,7 @@ def computeReviewerOverlap(df):
 
 
 def selectPapersToReview(df, min_agreement=1):
-    return df[df['included_count'] >= min_agreement]
+    res = df[df['included_count'] >= min_agreement]
+    res.drop(['key', 'issn', 'volume', 'pages'], axis=1, inplace=True)
+    return res
 
-
-def test():
-    df = loadRayyan('/Users/masterman/Downloads/b1c75bc72aef9d8e_45981_89617_2019-11-10_20-08-12.zip')
-    computeReviewerOverlap(df)
-    print(len(selectPapersToReview(df, 1)))
-
-
-if __name__ == '__main__':
-    test()
