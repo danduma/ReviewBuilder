@@ -2,6 +2,7 @@ from db.ref_utils import parseBibAuthors
 
 mapping = [
     ('address', 'AD'),
+    ('abstract', 'AB'),
     ('doi', 'DO'),
     ('eprint', 'LK'),
     ('editor', 'ED'),
@@ -40,7 +41,7 @@ def exportBibToRIS(entries):
             lines.append(au_line)
 
         # lines.append('PY - %s/%s/%s/' % (entry['year'], entry['month'], entry['day']))
-        lines.append('PY - %s///' % (entry.get('year',''),))
+        lines.append('Y1 - %s' % (entry.get('year',''),))
 
         pages = entry.get('pages')
         if pages:
