@@ -23,17 +23,6 @@ current_dir = os.path.dirname(os.path.realpath(__file__))
 CACHE_FILE = os.path.join(current_dir, "papers.sqlite")
 
 
-# from sqlalchemy.ext.declarative import declarative_base
-# from sqlalchemy import Column, Integer, String
-# Base = declarative_base()
-#
-# class Paper(Base):
-#     __tablename__ = 'papers'
-#     id = Column(Integer, primary_key=True)
-#     doi = Column(String, unique=True)
-#     pmid = Column(String, unique=True)
-#     scholarid = Column(String, unique=True)
-
 class Paper:
     """
     A Paper consists of 2 dicts: .bib and .extra_data
