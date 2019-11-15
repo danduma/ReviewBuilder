@@ -1,38 +1,79 @@
 from base.general_utils import loadEntriesAndSetUp, writeOutputBib
 from argparse import ArgumentParser
-from filter_results import filterPapers
+from filter_results import filterPapers, printReport, filterOnePaper
 from search.metadata_harvest import semanticscholarmetadata, enrichAndUpdateMetadata
+import pandas as pd
 
 
 def getCitingPapers(paper):
-
-    # res = semanticscholarmetadata.search(paper.title, '', get_citing_papers=True)
     try:
-        meta = semanticscholarmetadata.getMetadata(paper)
-    except:
+        paper, citing_papers = semanticscholarmetadata.getMetadata(paper, get_citing_papers=True)
+    except Exception as e:
+        print(e.__class__.__name__, e)
         return []
 
-    print(meta)
+    return citing_papers
+
 
 def deDupePaperList():
     pass
 
 
 def snowballCitations(paperstore, all_papers):
-    paper_list = []
+    newfound_paper_list = []
+    report = []
 
-    for paper in all_papers:
-        getCitingPapers(paper)
+    all_titles_ever_seen = {}
+    search_nodes = all_papers
+
+    while len(search_nodes) > 0:
+        paper = search_nodes.pop(0)
+        new_papers = getCitingPapers(paper)
+        for new_paper in new_papers:
+            if new_paper.title in all_titles_ever_seen:
+                print('[Skipping] already seen paper', new_paper.title)
+                all_titles_ever_seen[new_paper.title] += 1
+                continue
+
+            semanticscholarmetadata.getMetadata(new_paper)
+            new_paper.extra_data['done_semanticscholar'] = True
+            paperstore.updatePapers([new_paper])
+
+            all_titles_ever_seen[new_paper.title] = 1
+            # year = new_paper.bib.get('year', 0)
+            # if year and int(year) >= 2015:
+            #     newfound_paper_list.append(Paper(paper.bib, paper.extra_data))
+            # else:
+            #     print(new_paper)
+            paper, record = filterOnePaper(new_paper, exclude_rules={'no_pdf': False,
+                                                                     'year': False,
+                                                                     'is_review':False})
+            report.append(record)
+
+            if paper:
+                newfound_paper_list.append(paper)
+                print('Adding new seed paper', new_paper.bib['title'])
+                search_nodes.append(new_paper)
+            else:
+                print('[Excluded]:', record['exclude_reason'], new_paper.bib['title'])
+
+    df = pd.DataFrame(report, columns=['id', 'year', 'title', 'excluded', 'exclude_reason', 'language', 'abstract'])
+
+    return newfound_paper_list, df
 
 
 def main(conf):
     paperstore, papers_to_add, papers_existing, all_papers = loadEntriesAndSetUp(conf.input, conf.cache)
 
-    successful, unsuccessful = enrichAndUpdateMetadata(papers_to_add, paperstore, conf.email)
+    # successful, unsuccessful = enrichAndUpdateMetadata(papers_to_add, paperstore, conf.email)
 
-    snowballCitations(paperstore, all_papers)
+    snowballed_papers = snowballCitations(paperstore, all_papers)
+    print('Number of snowballed papers:', len(snowballed_papers))
 
-    included, df = filterPapers(all_papers)
+    successful, unsuccessful = enrichAndUpdateMetadata(snowballed_papers, paperstore, conf.email)
+
+    included, df = filterPapers(snowballed_papers)
+    printReport(df)
 
     writeOutputBib(included, conf.output)
 
