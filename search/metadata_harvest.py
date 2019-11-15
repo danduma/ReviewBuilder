@@ -138,7 +138,7 @@ class NiceScraper:
         :param headers: headers to pass
         :return: request object
         """
-        class_name=self.__class__.__name__.split('.')[-1]
+        class_name = self.__class__.__name__.split('.')[-1]
         status_code = 0
         retries = 0
 
@@ -154,7 +154,7 @@ class NiceScraper:
                 r = requests.get(url, headers=headers)
 
             if r.status_code == 429:
-                print(class_name,': Status code 429: waiting and retrying')
+                print(class_name, ': Status code 429: waiting and retrying')
                 sleep(30)
 
             status_code = r.status_code
@@ -196,7 +196,7 @@ class NiceScraper:
         try:
             results = self.search(paper.title, identity, max_results=5)
         except Exception as e:
-            print('Error during %s.search()' % class_name, e)
+            print('Error during %s.matchPaperFromResults()' % class_name, e)
             results = None
 
         if not results:
@@ -248,7 +248,8 @@ class CrossrefScraper(NiceScraper):
         """
         urllib.parse.quote(title, safe='')
         headers = {'User-Agent': 'ReviewBuilder(mailto:%s)' % identity}
-        url = 'https://api.crossref.org/works?rows={}&query.title={}'.format(max_results, title)
+        # changed because of https://status.crossref.org/incidents/4y45gj63jsp4
+        url = 'https://api.crossref.org/works?rows={}&query.bibliographic={}'.format(max_results, title)
         if year:
             url += '&query.published=' + str(year)
 
@@ -256,7 +257,7 @@ class CrossrefScraper(NiceScraper):
 
         d = r.json()
         if d['status'] != 'ok':
-            raise ValueError('Error in request:' + d['status'] + str(d['message']))
+            raise ValueError('Error in request:' + d.get('status', 'NO STATUS') + str(d.get('message', 'NO MESSAGE')))
 
         results = []
         for index, item in enumerate(d['message']['items']):
@@ -570,7 +571,7 @@ class GScholarScraper(NiceScraper):
                 bib = readBibtexString(text)[0]
 
             except Exception as e:
-                print(e)
+                print(e.__class__.__name__, e)
 
             bib['abstract'] = paper.abstract
             for key in ['abstract', 'eprint', 'url']:
@@ -581,6 +582,7 @@ class GScholarScraper(NiceScraper):
 
 class SemanticScholarScraper(NiceScraper):
 
+    @classmethod
     def loadSSAuthors(self, authors_dict):
         authors = []
         for author in authors_dict:
@@ -656,11 +658,16 @@ class SemanticScholarScraper(NiceScraper):
             return_results.append(new_res)
         return return_results
 
-    def getMetadata(self, paper):
-        if not paper.doi:
-            raise ValueError('paper has no DOI')
+    def getMetadata(self, paper, get_citing_papers=False):
+        if not paper.doi and not paper.extra_data.get('ss_id'):
+            raise ValueError('paper has no DOI or SSID')
 
-        url = 'https://api.semanticscholar.org/v1/paper/' + paper.doi
+        if paper.extra_data.get('ss_id'):
+            unique_id = paper.extra_data.get('ss_id')
+        else:
+            unique_id = paper.doi
+
+        url = 'https://api.semanticscholar.org/v1/paper/' + unique_id
 
         r = self.request(url)
         d = r.json()
@@ -688,6 +695,33 @@ class SemanticScholarScraper(NiceScraper):
         paper.extra_data['ss_authors'] = d['authors']
         paper.extra_data['ss_id'] = d['paperId']
 
+        if get_citing_papers:
+            citing_papers = []
+            for index, citation in enumerate(d['citations']):
+                ss_authors = semanticscholarmetadata.loadSSAuthors(citation['authors'])
+                authors=authorListFromDict(ss_authors)
+
+                bib = {
+                    'title': citation['title'],
+                    'author': authors,
+                    'year': citation['year'],
+                    'doi': citation['year'],
+                }
+                bib = fixBibData(bib, index)
+
+                extra_data = {
+                    'ss_id': citation['paperId'],
+                    'ss_influential': citation['isInfluential'],
+                    'ss_authors': ss_authors
+                }
+                if citation.get('arxivId'):
+                    extra_data['arxivid'] = citation.get('arxivId')
+
+                new_paper = Paper(bib, extra_data)
+                citing_papers.append(new_paper)
+            return paper, citing_papers
+        return paper
+
 
 crossref_scraper = CrossrefScraper()
 scholar_scraper = GScholarScraper(basic_delay=0.1)
@@ -706,7 +740,7 @@ def enrichAndUpdateMetadata(papers, paperstore, identity):
             enrichMetadata(paper, identity)
             successful.append(paper)
         except Exception as e:
-            print(e)
+            print(e.__class__.__name__, e)
             unsuccessful.append(paper)
 
         paperstore.updatePapers([paper])
