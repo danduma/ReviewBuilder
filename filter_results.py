@@ -110,84 +110,96 @@ def collectStats(papers):
     print()
 
 
+def filterOnePaper(paper, exclude_rules={}):
+    record = {
+        'title': paper.title,
+        # 'year': int(paper.year) if paper.year else None,
+        'year': paper.year,
+        'authors': paper.authors,
+        'venue': paper.venue,
+        'abstract': paper.abstract,
+        'excluded': False,
+        'exclude_reason': None
+    }
+    accept = True
+
+    text = getPaperText(paper)
+    language = paper.extra_data.get('language')
+
+    if not language:
+        if len(text) < 62 or text.isupper():
+            language = 'en'
+        else:
+            language = detect(text)
+
+        # if language != 'en':
+        #     print(text)
+        #     print("Lang:", language)
+        #     print()
+
+    language = language.lower()
+    record['language'] = language
+
+    lower_text = text.lower()
+
+    if paper.title == "Identifying peripheral arterial disease cases using natural language processing of clinical notes":
+        print()
+
+    if exclude_rules.get('language', True) and not language.startswith('en'):
+        record['excluded'] = True
+        record['exclude_reason'] = 'language'
+        accept = False
+    elif exclude_rules.get('is_patent', True) and isPatent(paper):
+        record['excluded'] = True
+        record['exclude_reason'] = 'is_patent'
+        accept = False
+    elif exclude_rules.get('year', True) and int(paper.bib.get('year', 0)) < 2015:
+        record['excluded'] = True
+        record['exclude_reason'] = 'year'
+        accept = False
+    elif exclude_rules.get('is_review', True) and oneKeywordInText(['review', 'overview'],
+                                                                   paper.title.lower()) or oneKeywordInText(
+            ['this review', 'this chapter'], lower_text):
+        record['excluded'] = True
+        record['exclude_reason'] = 'is_review'
+        accept = False
+    elif exclude_rules.get('uses_images', True) and oneKeywordInText(
+            ['images', 'visual', 'chest x-ray', 'segmentation'], lower_text):
+        record['excluded'] = True
+        record['exclude_reason'] = 'uses_images'
+        accept = False
+    elif exclude_rules.get('no_pdf', True) and not paper.has_pdf:
+        record['excluded'] = True
+        record['exclude_reason'] = 'no_pdf'
+        accept = False
+    elif exclude_rules.get('not_radiology', True) and allKeywordsNotInText(
+            ['radiolo', 'imaging report', ' CT', ',CT', ':CT', 'MRI'], lower_text):
+        record['excluded'] = True
+        record['exclude_reason'] = 'not_radiology'
+        accept = False
+    elif exclude_rules.get('not_nlp', True) and allKeywordsNotInText(
+            ['text', 'langu', 'lingu', 'nlp', 'synta', 'embedding', 'information extraction',
+             'text mining', 'words',
+             'deep learning', 'deep neural',
+             'machine learning', 'artificial intelligence', 'document classification', ],
+            lower_text):
+        record['excluded'] = True
+        record['exclude_reason'] = 'not_nlp'
+        accept = False
+
+    if accept:
+        return paper, record
+    else:
+        return None, record
+
+
 def filterPapers(papers):
     included = []
     report = []
 
     for paper in papers:
-        record = {
-            'title': paper.title,
-            # 'year': int(paper.year) if paper.year else None,
-            'year': paper.year,
-            'authors': paper.authors,
-            'venue': paper.venue,
-            'abstract': paper.abstract,
-            'excluded': False,
-            'exclude_reason': None
-        }
-        accept = True
-
-        text = getPaperText(paper)
-        language = paper.extra_data.get('language')
-
-        if not language:
-            if len(text) < 62 or text.isupper():
-                language = 'en'
-            else:
-                language = detect(text)
-
-            # if language != 'en':
-            #     print(text)
-            #     print("Lang:", language)
-            #     print()
-
-        language = language.lower()
-        record['language'] = language
-
-        lower_text = text.lower()
-
-        if paper.title == "Identifying peripheral arterial disease cases using natural language processing of clinical notes":
-            print()
-
-        if not language.startswith('en'):
-            record['excluded'] = True
-            record['exclude_reason'] = 'language'
-            accept = False
-        elif isPatent(paper):
-            record['excluded'] = True
-            record['exclude_reason'] = 'is_patent'
-            accept = False
-        elif int(paper.bib.get('year', 0)) < 2015:
-            record['excluded'] = True
-            record['exclude_reason'] = 'year'
-            accept = False
-        elif oneKeywordInText(['review', 'overview'], paper.title.lower()) or oneKeywordInText(['this review', 'this chapter'], lower_text):
-            record['excluded'] = True
-            record['exclude_reason'] = 'is_review'
-            accept = False
-        elif oneKeywordInText(['images', 'visual', 'chest x-ray', 'segmentation'], lower_text):
-            record['excluded'] = True
-            record['exclude_reason'] = 'uses_images'
-            accept = False
-        elif not paper.has_pdf:
-            record['excluded'] = True
-            record['exclude_reason'] = 'no_pdf'
-            accept = False
-        elif allKeywordsNotInText(['radiolo', 'imaging report', ' CT', ',CT', ':CT', 'MRI'], lower_text):
-            record['excluded'] = True
-            record['exclude_reason'] = 'not_radiology'
-            accept = False
-        elif allKeywordsNotInText(
-                ['text', 'langu', 'lingu', 'nlp', 'synta', 'embedding', 'information extraction',
-                 'text mining', 'words',
-                 'deep learning', 'deep neural',
-                 'machine learning', 'artificial intelligence', 'document classification', ],
-                lower_text):
-            record['excluded'] = True
-            record['exclude_reason'] = 'not_nlp'
-            accept = False
-
-        if accept:
+        paper, record = filterOnePaper(paper)
+        if paper:
             included.append(paper)
         report.append(record)
 
@@ -206,6 +218,7 @@ def main(conf):
     df.to_csv(conf.report_path)
 
     writeOutputBib(included, conf.output)
+
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Filter results ')
