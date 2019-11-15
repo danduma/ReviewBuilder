@@ -1,4 +1,5 @@
 from db.ref_utils import parseBibAuthors
+from RISparser import readris
 
 mapping = [
     ('address', 'AD'),
@@ -41,7 +42,7 @@ def exportBibToRIS(entries):
             lines.append(au_line)
 
         # lines.append('PY  - %s/%s/%s/' % (entry['year'], entry['month'], entry['day']))
-        lines.append('PY  - %s' % (entry.get('year',''),))
+        lines.append('PY  - %s' % (entry.get('year', ''),))
 
         pages = entry.get('pages')
         if pages:
@@ -64,6 +65,18 @@ def writeBibToRISFile(entries, filename):
         text = exportBibToRIS(entries)
         f.write(text)
 
+
 def writeRIS(papers, filename):
     bibs = [paper.bib for paper in papers]
     writeBibToRISFile(bibs, filename)
+
+
+def readRIS(filename):
+    with open(filename, 'r') as f:
+        entries = readris(f)
+
+    for entry in entries:
+        print(entry)
+
+    return entries
+

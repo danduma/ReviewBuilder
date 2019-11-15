@@ -57,21 +57,42 @@ def loadRayyan(filename):
     df.insert(len(df.columns), 'exclusion_reasons', column_exclusion_reasons)
     df.insert(len(df.columns), 'labels', column_labels)
 
+    for index, row in df.iterrows():
+        match = re.search(r'PY - (\d+)\/+?', row['authors'])
+        if match:
+            df.at[index, 'year'] = match.group(1)
+            df.at[index, 'authors'] = df.iloc[index]['authors'][:match.start()]
+
     included_counts = []
+    excluded_counts = []
+    maybe_counts = []
 
     for index, row in df.iterrows():
         included_count = 0
+        excluded_count = 0
+        maybe_count = 0
         for reviewer in reviewer_titles:
             if row.get(reviewer) == 'Included':
                 included_count += 1
+            elif row.get(reviewer) == 'Excluded':
+                excluded_count += 1
+            elif row.get(reviewer) == 'Maybe':
+                maybe_count += 1
         included_counts.append(included_count)
+        excluded_counts.append(excluded_count)
+        maybe_counts.append(maybe_count)
 
     df.insert(len(df.columns), 'included_count', included_counts)
+    df.insert(len(df.columns), 'excluded_count', excluded_counts)
+    df.insert(len(df.columns), 'maybe_count', maybe_counts)
 
     return df
 
 
 def computeOverlap(df):
+    reviewer_columns = [c for c in df.columns if c.startswith('reviewer_')]
+    df = df[reviewer_columns]
+
     a = df.values
     d = {(i, j): np.mean(a[:, i] == a[:, j]) for i, j in combinations(range(a.shape[1]), 2)}
 
@@ -94,39 +115,30 @@ def computeOverlap3(df):
 # def computeOverlap(df):
 #     pd.crosstab(df.columns, df.columns, )
 
-def filterDFForInclusion(df, reviewer_columns, screen='Included'):
-    df2 = df.copy()
-
-    rows_to_include = []
-
-    for index, row in df2.iterrows():
-        for reviewer in reviewer_columns:
-            if row.get(reviewer) == screen:
-                rows_to_include.append(index)
-                break
-    return df2.iloc[rows_to_include]
+def filterDFForInclusion(df, screen='Included'):
+    if screen == 'Included':
+        return df[df['included_count'] > 0]
+    elif screen == 'Excluded':
+        return df[df['excluded_count'] > 0]
+    elif screen == 'Maybe':
+        return df[df['maybe_count'] > 0]
 
 
 def computeReviewerOverlap(df):
-    reviewer_columns = [c for c in df.columns if c.startswith('reviewer_')]
-    df = df[reviewer_columns]
+    # df.at[df['reviewer_agrivas'] == 'Maybe', 'reviewer_agrivas'] = 'Included'
+    # df.at[df['reviewer_Daniel'] == 'Maybe', 'reviewer_Daniel'] = 'Included'
 
-    # df.loc[df['reviewer_agrivas'] == 'Maybe', 'reviewer_agrivas'] = 'Included'
-    # df.loc[df['reviewer_Daniel'] == 'Maybe', 'reviewer_Daniel'] = 'Included'
-
-    res_df = computeOverlap(df)
     print('Total overlap')
-    print(res_df)
+    print(computeOverlap(df))
 
     print('\nIncluded overlap')
-    print(computeOverlap(filterDFForInclusion(df, reviewer_columns, 'Included')))
+    print(computeOverlap(filterDFForInclusion(df, 'Included')))
 
     print('\nExcluded overlap')
-    print(computeOverlap(filterDFForInclusion(df, reviewer_columns, 'Excluded')))
+    print(computeOverlap(filterDFForInclusion(df, 'Excluded')))
 
 
 def selectPapersToReview(df, min_agreement=1):
     res = df[df['included_count'] >= min_agreement]
-    res.drop(['key', 'issn', 'volume', 'pages'], axis=1, inplace=True)
+    res.drop(['key', 'issn', 'volume', 'pages', 'issue', 'language', 'location', 'notes'], axis=1, inplace=True)
     return res
-

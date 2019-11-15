@@ -14,7 +14,7 @@ if __name__ == '__main__':
     parser = ArgumentParser(description='Filter results ')
 
     parser.add_argument('-i', '--input', type=str,
-                        help='Input bib file name')
+                        help='Input bib/RIS/CSV file name')
     parser.add_argument('-d', '--dir', type=str,
                         help='Directory where to store the output')
     parser.add_argument('-c', '--cache', type=bool, default=True,

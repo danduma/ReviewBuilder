@@ -24,7 +24,7 @@ def fixBibData(bib, index):
         else:
             bib["ID"] = authors[0]["family"]
 
-        bib['ID'] += bib.get("year", "YEAR") + bib["title"].split()[0].lower()
+        bib['ID'] += str(bib.get("year", "YEAR")) + bib["title"].split()[0].lower()
 
     return bib
 
