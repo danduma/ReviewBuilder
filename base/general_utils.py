@@ -3,8 +3,9 @@ from db.data import PaperStore, Paper
 from search import getSearchResultsFromBib
 from db.ref_utils import simpleResultDeDupe
 from db.bibtex import writeBibtex
-from db.ris import writeRIS
+from db.ris import writeRIS, readRIS
 from db.csv import readCSVFile
+from search.metadata_harvest import mergeResultData
 
 def loadEntriesAndSetUp(input, use_cache=True, max_results=10000000):
     if use_cache:
@@ -24,7 +25,7 @@ def loadEntriesAndSetUp(input, use_cache=True, max_results=10000000):
         missing = results
 
     papers_to_add = [Paper(res.bib, res.extra_data) for res in missing]
-    papers_existing = [res.paper for res in found]
+    papers_existing = [mergeResultData(res, res.paper) for res in found]
 
     all_papers = papers_to_add + papers_existing
 
@@ -40,7 +41,7 @@ def readInputBib(filename):
     elif filename.endswith('.csv'):
         return readCSVFile(filename)
     elif filename.endswith('.ris'):
-        raise NotImplementedError
+        return readRIS(filename)
 
 def writeOutputBib(bib, filename):
     if filename.endswith('.ris'):
