@@ -145,6 +145,14 @@ def filterOnePaper(paper, exclude_rules={}):
     if paper.title == "Identifying peripheral arterial disease cases using natural language processing of clinical notes":
         print()
 
+    try:
+        if paper.bib.get('year') is None or paper.bib.get('year') == '':
+            paper.bib['year'] = 0
+        else:
+            paper.bib['year'] = int(paper.bib['year'])
+    except:
+        paper.bib['year'] = 0
+
     if exclude_rules.get('language', True) and not language.startswith('en'):
         record['excluded'] = True
         record['exclude_reason'] = 'language'
