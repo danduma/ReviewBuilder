@@ -280,6 +280,8 @@ class PaperStore:
         """
         c = self.conn.cursor()
 
+        self.createVirtualTable()
+
         norm_title = normalizeTitle(paper.title)
 
         bits = norm_title.split()
@@ -413,8 +415,11 @@ def computeAuthorDistance(paper1, paper2):
     :param paper2:
     :return:
     """
-    authors1 = paper1.extra_data.get('x_authors', parseBibAuthors(paper1.bib['author']))
-    authors2 = paper2.extra_data.get('x_authors', parseBibAuthors(paper2.bib['author']))
+    if not paper1.bib.get('author') or not paper2.bib.get('author'):
+        return 1
+
+    authors1 = paper1.extra_data.get('x_authors', parseBibAuthors(paper1.bib.get('author')))
+    authors2 = paper2.extra_data.get('x_authors', parseBibAuthors(paper2.bib.get('author')))
 
     score = 0
     if len(authors1) >= len(authors2):
