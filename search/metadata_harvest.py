@@ -59,7 +59,7 @@ def refreshDOIfromURLs(paper):
 
 def mergeResultData(result1, result2):
     """
-    Merges bibtex and extra_data dictionaries for a SearchResult and or a Paper
+    Merges bibtex and extra_data dictionaries for a SearchResult and/or a Paper
 
     :param result1:
     :param result2:
