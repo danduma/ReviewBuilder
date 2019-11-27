@@ -45,14 +45,26 @@ def snowballCitations(paperstore, all_papers):
             #     newfound_paper_list.append(Paper(paper.bib, paper.extra_data))
             # else:
             #     print(new_paper)
-            paper, record = filterOnePaper(new_paper, exclude_rules={'no_pdf': False,
-                                                                     'year': False,
-                                                                     'is_review':False})
+            if not new_paper.has_abstract:
+                record = {
+                    'title': paper.title,
+                    'year': paper.year,
+                    'authors': paper.authors,
+                    'venue': paper.venue,
+                    'abstract': paper.abstract,
+                    'excluded': False,
+                    'exclude_reason': None
+                }
+                paper_add = new_paper
+            else:
+                paper_add, record = filterOnePaper(new_paper, exclude_rules={'no_pdf': False,
+                                                                             'year': False,
+                                                                             'is_review': False})
             report.append(record)
 
-            if paper:
-                newfound_paper_list.append(paper)
-                print('Adding new seed paper', new_paper.bib['title'])
+            if paper_add:
+                newfound_paper_list.append(paper_add)
+                print('Adding new seed paper', paper_add.bib['title'])
                 search_nodes.append(new_paper)
             else:
                 print('[Excluded]:', record['exclude_reason'], new_paper.bib['title'])
@@ -67,15 +79,16 @@ def main(conf):
 
     # successful, unsuccessful = enrichAndUpdateMetadata(papers_to_add, paperstore, conf.email)
 
-    snowballed_papers = snowballCitations(paperstore, all_papers)
+    snowballed_papers, df = snowballCitations(paperstore, all_papers)
     print('Number of snowballed papers:', len(snowballed_papers))
+    printReport(df)
 
     successful, unsuccessful = enrichAndUpdateMetadata(snowballed_papers, paperstore, conf.email)
 
-    included, df = filterPapers(snowballed_papers)
-    printReport(df)
+    # included, df = filterPapers(snowballed_papers)
+    # printReport(df)
 
-    writeOutputBib(included, conf.output)
+    writeOutputBib(snowballed_papers, conf.output)
 
 
 if __name__ == '__main__':
@@ -84,7 +97,7 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--input', type=str,
                         help='Input bib file name with seed papers')
     parser.add_argument('-o', '--output', type=str,
-                        help='Output bib file name with snowballed')
+                        help='Output bib file name with snowballed papers')
     parser.add_argument('-r', '--report-path', type=str, default='filter_report.csv',
                         help='Path to output report CSV')
     parser.add_argument('-c', '--cache', type=bool, default=True,
