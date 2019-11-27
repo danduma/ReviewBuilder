@@ -81,13 +81,17 @@ def generateUniqueID(paper):
             authors = [{'given': '', 'family': ''}]
 
     for author in authors:
-        if author.get('family'):
-            author_bit += author.get('family', '_')[0] + author.get('given', '_')[0]
+        if isinstance(author, str):
+            author_bit += author
+        else:
+            if author.get('family'):
+                author_bit += author.get('family', '_')[0] + author.get('given', '_')[0]
 
     title_bit = normalizeTitle(paper.title)
     title_bit = re.sub("\s+", "", title_bit)
     full_id = title_bit + "_" + author_bit
     full_id = full_id.lower()
+
     return full_id
 
 
