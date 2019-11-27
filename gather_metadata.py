@@ -1,4 +1,4 @@
-from base.general_utils import loadEntriesAndSetUp
+from base.general_utils import loadEntriesAndSetUp, writeOutputBib
 
 from search import enrichAndUpdateMetadata
 from argparse import ArgumentParser
@@ -15,7 +15,7 @@ def main(conf):
         enrichAndUpdateMetadata(papers_existing, paperstore, conf.email)
 
     all_papers = papers_to_add + papers_existing
-    writeBibtex(all_papers, conf.output)
+    writeOutputBib(all_papers, conf.output)
 
 
 if __name__ == '__main__':
@@ -23,9 +23,9 @@ if __name__ == '__main__':
         description='Gathers metadata, including the abstract, on a list of search results by searching on Crossref, PubMed, arXiv, Semantic Scholar and Unpaywall')
 
     parser.add_argument('-i', '--input', type=str,
-                        help='Input Bibtex file with the previously cached search results')
+                        help='Input BIB/RIS file with the previously cached search results')
     parser.add_argument('-o', '--output', type=str,
-                        help='Output Bbibex file into which to update the new, augmented results')
+                        help='Output BIB/RIS file into which to update the new, augmented results')
     parser.add_argument('-m', '--max', type=int, default=100,
                         help='Maximum number of results to process')
     parser.add_argument('-em', '--email', type=str,
