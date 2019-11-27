@@ -53,7 +53,7 @@ def exportBibToRIS(entries):
 
         for eq in mapping:
             if entry.get(eq[0]):
-                lines.append(eq[1] + '  - ' + entry[eq[0]])
+                lines.append(str(eq[1]) + '  - ' + str(entry[eq[0]]))
 
         lines.append('ER  - ')
 
