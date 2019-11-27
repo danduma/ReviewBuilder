@@ -43,6 +43,9 @@ author_regex4 = re.compile("^(" + pLu + "[\w\-]+)\s+([\w\.\s\-]+)(van|von|dos|de
 
 
 def parseBibAuthors(authors):
+    if not authors:
+        return {"given": '', "family": ''}
+
     bits = authors.split('and')
     authors = []
     for bit in bits:
