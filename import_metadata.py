@@ -3,7 +3,7 @@ from base.general_utils import loadEntriesAndSetUp, writeOutputBib
 import pandas as pd
 
 def main(conf):
-    paperstore, papers_to_add, papers_existing, all_papers = loadEntriesAndSetUp(conf.input, conf.cache)
+    paperstore, papers_to_add, papers_existing, all_papers = loadEntriesAndSetUp(conf.input, True)
 
     paperstore.addPapers(papers_to_add)
     if conf.force:
