@@ -1,4 +1,5 @@
 import re
+from db.data import Paper
 
 MAX_RESULTS = 100
 
@@ -11,12 +12,11 @@ class Searcher:
         pass
 
 
-class SearchResult:
+class SearchResult(Paper):
     def __init__(self, index, bib, source, extra_data):
+        super().__init__(bib, extra_data)
         self.index = index
-        self.bib = bib
         self.source = source
-        self.extra_data = extra_data
         self.paper = None
 
     def __getitem__(self, item):
