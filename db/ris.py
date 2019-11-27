@@ -1,4 +1,5 @@
-from db.ref_utils import parseBibAuthors
+from db.bibtex import fixBibData
+from db.ref_utils import parseBibAuthors, authorListFromListOfAuthors
 from RISparser import readris
 
 mapping = [
@@ -21,6 +22,8 @@ type_mapping = {
     'thesis': 'THES',
     'book': 'BOOK',
 }
+
+reverse_type_mapping = {b: a for a, b in type_mapping.items()}
 
 
 def exportBibToRIS(entries):
@@ -75,8 +78,20 @@ def readRIS(filename):
     with open(filename, 'r') as f:
         entries = readris(f)
 
+    res = []
+
     for entry in entries:
-        print(entry)
+        entry['author'] = authorListFromListOfAuthors(entry.get('authors', []))
+        if 'authors' in entry:
+            del entry['authors']
 
-    return entries
+        new_type = 'article'
+        if entry.get('type_of_reference'):
+            if entry['type_of_reference'] in reverse_type_mapping:
+                new_type = reverse_type_mapping[entry['type_of_reference']]
 
+        entry['ENTRYTYPE'] = new_type
+        entry = fixBibData(entry, 0)
+        res.append(entry)
+
+    return res
