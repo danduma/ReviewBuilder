@@ -50,10 +50,12 @@ def main(conf):
     list_and = set_intersect(s1, s2)
     list_or = set_union(s1, s2)
 
-    writeOutputBib(list_sub1, conf.output + '_a-b.bib')
-    writeOutputBib(list_sub2, conf.output + '_b-a.bib')
-    writeOutputBib(list_and, conf.output + '_a_and_b.bib')
-    writeOutputBib(list_or, conf.output + '_a_or_b.bib')
+    output_format = conf.format.lower()
+
+    writeOutputBib(list_sub1, conf.output + '_a-b.' + output_format)
+    writeOutputBib(list_sub2, conf.output + '_b-a.' + output_format)
+    writeOutputBib(list_and, conf.output + '_a_and_b.' + output_format)
+    writeOutputBib(list_or, conf.output + '_a_or_b.' + output_format)
 
     print('A - B:', len(list_sub1))
     print('B - A:', len(list_sub2))
@@ -66,11 +68,13 @@ if __name__ == '__main__':
         description='Compute diff between bib lists. Takes 2 lists of bib entries, an "old" and a "new" one. It outputs 3 lists: 1. papers only found in input1 2. papers only in input 2 3. papers in both')
 
     parser.add_argument('-i1', '--input1', type=str,
-                        help='Input bib/RIS/CSV file name (older)')
+                        help='Input BIB/RIS/CSV file name (set A)')
     parser.add_argument('-i2', '--input2', type=str,
-                        help='Input bib/RIS/CSV file name (newer)')
+                        help='Input BIB/RIS/CSV file name (set B)')
     parser.add_argument('-o', '--output', type=str,
                         help='Beginning of output filename')
+    parser.add_argument('-f', '--format', type=str, default='bib',
+                        help='Output format: bib, ris, csv')
 
     conf = parser.parse_args()
 
