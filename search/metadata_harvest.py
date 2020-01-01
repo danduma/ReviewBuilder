@@ -15,6 +15,7 @@ from time import sleep
 from datetime import timedelta
 from io import StringIO, BytesIO
 from lxml import etree
+import datetime
 
 BIB_FIELDS_TRANSFER = ['abstract', 'address', 'annote', 'author', 'booktitle', 'chapter',
                        'crossref', 'doi', 'edition', 'editor',
@@ -593,69 +594,95 @@ class SemanticScholarScraper(NiceScraper):
             authors.append(new_author)
         return authors
 
-    def search(self, title, identity, max_results=5):
+    def search(self, title, identity, max_results=5, min_year=None, max_year=None):
         url = 'https://www.semanticscholar.org/api/1/search'
 
-        data = {"queryString": title,
-                "page": 1,
-                "pageSize": 10,
-                "sort": "relevance",
-                "authors": [],
-                "coAuthors": [],
-                "venues": [],
-                "yearFilter": None,
-                "requireViewablePdf": False,
-                "publicationTypes": [],
-                "externalContentTypes": []
-                }
+        yearFilter = None
 
-        r = self.request(url, data=data, post=True)
+        if min_year or max_year:
+            yearFilter = {}
+            if not max_year:
+                now = datetime.datetime.now()
+                max_year = now.year
 
-        results_dict = r.json()
-        if 'results' in results_dict:
-            results = results_dict['results']
-        else:
-            return []
+            if min_year:
+                yearFilter['min'] = int(min_year)
+            if max_year:
+                yearFilter['max'] = int(max_year)
+
+        results_left = max_results
+        page_num = 1
 
         return_results = []
-        for index, res in enumerate(results[:max_results]):
 
-            res_title = res['title']['text']
+        while results_left > 0:
+            data = {"queryString": title,
+                    "page": page_num,
+                    "pageSize": 10,
+                    "sort": "relevance",
+                    "authors": [],
+                    "coAuthors": [],
+                    "venues": [],
+                    "yearFilter": yearFilter,
+                    "requireViewablePdf": False,
+                    "publicationTypes": [],
+                    "externalContentTypes": []
+                    }
 
-            authors_processed = []
-            for author_list in res['authors']:
-                for author_dict in author_list:
-                    if 'name' in author_dict:
-                        authors_processed.append(author_dict)
+            r = self.request(url, data=data, post=True)
 
-            authors = self.loadSSAuthors(authors_processed)
+            results_dict = r.json()
 
-            bib = {'title': res_title,
-                   'abstract': res['paperAbstract']['text'],
-                   'year': res['year']['text'],
-                   'url': 'https://www.semanticscholar.org/paper/{}/{}'.format(res['slug'],
-                                                                               res['id']),
-                   'author': authorListFromDict(authors),
-                   }
+            if results_dict.get('totalResults') and max_results != results_dict['totalResults']:
+                max_results = min(max_results, results_dict['totalResults'])
+                results_left = max_results
 
-            if res.get('doiInfo'):
-                bib['doi'] = res['doiInfo'].get('doi')
+            if 'results' in results_dict:
+                results = results_dict['results']
+            else:
+                results = []
 
-            extra_data = {
-                'ss_id': res['id'],
-                'x_authors': authors
-            }
+            results_left -= len(results)
 
-            new_res = SearchResult(index, bib, 'semantischolar', extra_data)
+            for index, res in enumerate(results[:results_left]):
 
-            for link in res.get('links', []):
-                if isPDFURL(link['url']):
-                    bib['eprint'] = link['url']
-                    addUrlIfNew(new_res, link['url'], 'pdf', 'semanticscholar')
+                res_title = res['title']['text']
 
-            venue = res['venue'].get('text')
-            extra_data['venue'] = venue
-            return_results.append(new_res)
+                authors_processed = []
+                for author_list in res['authors']:
+                    for author_dict in author_list:
+                        if 'name' in author_dict:
+                            authors_processed.append(author_dict)
+
+                authors = self.loadSSAuthors(authors_processed)
+
+                bib = {'title': res_title,
+                       'abstract': res['paperAbstract']['text'],
+                       'year': res['year']['text'],
+                       'url': 'https://www.semanticscholar.org/paper/{}/{}'.format(res['slug'],
+                                                                                   res['id']),
+                       'author': authorListFromDict(authors),
+                       }
+
+                if res.get('doiInfo'):
+                    bib['doi'] = res['doiInfo'].get('doi')
+
+                extra_data = {
+                    'ss_id': res['id'],
+                    'x_authors': authors
+                }
+
+                new_res = SearchResult(index, bib, 'semantischolar', extra_data)
+
+                for link in res.get('links', []):
+                    if isPDFURL(link['url']):
+                        bib['eprint'] = link['url']
+                        addUrlIfNew(new_res, link['url'], 'pdf', 'semanticscholar')
+
+                venue = res['venue'].get('text')
+                extra_data['venue'] = venue
+                return_results.append(new_res)
+
         return return_results
 
     def getMetadata(self, paper, get_citing_papers=False):
@@ -699,7 +726,7 @@ class SemanticScholarScraper(NiceScraper):
             citing_papers = []
             for index, citation in enumerate(d['citations']):
                 ss_authors = semanticscholarmetadata.loadSSAuthors(citation['authors'])
-                authors=authorListFromDict(ss_authors)
+                authors = authorListFromDict(ss_authors)
 
                 bib = {
                     'title': citation['title'],
