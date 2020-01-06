@@ -7,3 +7,4 @@ tqdm
 bibtexparser
 requests
 strsimpy
+RISparser==0.4.3
