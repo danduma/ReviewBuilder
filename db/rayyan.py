@@ -6,12 +6,26 @@ import numpy as np
 from io import BytesIO
 
 
+DROP_FIELDS = ['key',
+               'issn',
+               'volume',
+               'pages',
+               'issue',
+               'language',
+               'location',
+               'notes',
+               'journal',
+               'day',
+               'month',
+               'maybe_count']
+
+
 def parseInclusion(text):
     reviewers = {}
     exclusion_reasons = []
     labels = []
 
-    for match in re.findall('\"([\w\s]+?)\"=>\"([\w\s]+?)\"', text):
+    for match in re.findall('\"([\w\s\.]+?)\"=>\"([\w\s]+?)\"', text):
         reviewers[match[0]] = match[1]
 
         if match[1].lower() == 'excluded':
@@ -140,5 +154,11 @@ def computeReviewerOverlap(df):
 
 def selectPapersToReview(df, min_agreement=1):
     res = df[df['included_count'] >= min_agreement]
-    res.drop(['key', 'issn', 'volume', 'pages', 'issue', 'language', 'location', 'notes'], axis=1, inplace=True)
+    res.drop(DROP_FIELDS, axis=1, inplace=True)
+    return res
+
+
+def selectPapersToFilter(df, include_count, exclude_count):
+    res = df[(df['included_count'] == include_count) & (df['excluded_count'] == exclude_count)]
+    res.drop(DROP_FIELDS, axis=1, inplace=True)
     return res
