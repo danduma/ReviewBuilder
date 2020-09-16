@@ -71,6 +71,7 @@ def allKeywordsNotInText(keywords, text):
 
 
 def printReport(df):
+    print(df)
     print('Included papers', len(df[df['excluded'] == False]))
     print('Excluded papers', len(df[df['excluded'] == True]))
     print('Excluded because of')
@@ -79,7 +80,7 @@ def printReport(df):
     print('  year out of range', len(df[df['exclude_reason'] == 'year']))
     print('  is a review', len(df[df['exclude_reason'] == 'is_review']))
     print('  using images', len(df[df['exclude_reason'] == 'uses_images']))
-    print('  full text not available', len(df[df['exclude_reason'] == 'no_pdf']))
+    # print('  full text not available', len(df[df['exclude_reason'] == 'no_pdf']))
     print('  not radiology', len(df[df['exclude_reason'] == 'not_radiology']))
     print('  not NLP', len(df[df['exclude_reason'] == 'not_nlp']))
 
@@ -176,10 +177,10 @@ def filterOnePaper(paper, exclude_rules={}):
         record['excluded'] = True
         record['exclude_reason'] = 'uses_images'
         accept = False
-    elif exclude_rules.get('no_pdf', True) and not paper.has_pdf:
-        record['excluded'] = True
-        record['exclude_reason'] = 'no_pdf'
-        accept = False
+    # elif exclude_rules.get('no_pdf', True) and not paper.has_pdf:
+    #     record['excluded'] = True
+    #     record['exclude_reason'] = 'no_pdf'
+    #     accept = False
     elif exclude_rules.get('not_radiology', True) and allKeywordsNotInText(
             ['radiolo', 'imaging report', ' CT', ',CT', ':CT', 'MRI'], lower_text):
         record['excluded'] = True
@@ -227,6 +228,8 @@ def main(conf):
 
     writeOutputBib(included, conf.output)
 
+    return df
+
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Filter results ')
@@ -242,4 +245,4 @@ if __name__ == '__main__':
 
     conf = parser.parse_args()
 
-    main(conf)
+    df = main(conf)

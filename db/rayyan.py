@@ -6,12 +6,26 @@ import numpy as np
 from io import BytesIO
 
 
+DROP_FIELDS = ['key',
+               'issn',
+               'volume',
+               'pages',
+               'issue',
+               'language',
+               'location',
+               'notes',
+               'journal',
+               'day',
+               'month',
+               'maybe_count']
+
+
 def parseInclusion(text):
     reviewers = {}
     exclusion_reasons = []
     labels = []
 
-    for match in re.findall('\"([\w\s]+?)\"=>\"([\w\s]+?)\"', text):
+    for match in re.findall('\"([\w\s\.]+?)\"=>\"([\w\s]+?)\"', text):
         reviewers[match[0]] = match[1]
 
         if match[1].lower() == 'excluded':
@@ -104,6 +118,79 @@ def computeOverlap(df):
     return pd.DataFrame(res, columns=df.columns, index=df.columns)
 
 
+# def compute_agreement(vals, vala, valb):
+#     # Use to compute TP/TN/FP/FN
+#     d = {(i, j): np.sum((vals[:, i] == vala) & (vals[:, j] == valb))
+#          for i, j in combinations(range(vals.shape[1]), 2)}
+#     df, c, vals = np.zeros((vals.shape[1], vals.shape[1])), \
+#                       list(map(list, zip(*d.keys()))), list(d.values())
+#     df[c[0], c[1]] = vals
+#     return df
+
+
+# def computeStats(df):
+#     reviewer_columns = [c for c in df.columns if c.startswith('reviewer_')]
+#     df = df[reviewer_columns]
+#
+#     a = df.values
+#     TP = compute_agreement(a, 'Included', 'Included')
+#     TN = compute_agreement(a, 'Excluded', 'Excluded')
+#     FP = compute_agreement(a, 'Included', 'Excluded')
+#     FN = compute_agreement(a, 'Excluded', 'Included')
+#
+#     print('TP', TP)
+#     print('TN', TN)
+#     print('FP', FP)
+#     print('FN', FN)
+#
+#     print('Total', TP+TN+FP+FN)
+
+
+def computeFleiss(df):
+    reviewer_columns = [c for c in df.columns if c.startswith('reviewer_')]
+    df = df[reviewer_columns]
+
+    a = df.values
+    classes = set(a.ravel())
+
+    # rows are instances/examples
+    # columns are classes
+    # values are number of annotators assigned instance to class
+    # so sum of each rows = num annotators
+    P = np.hstack([np.sum(a == c, axis=1, keepdims=True)
+                  for c in classes])
+    # Below is wikipedia example - expected kappa: 0.210
+    # P = np.array([[0, 0, 0, 0, 14],
+    #               [0, 2, 6, 4, 2],
+    #               [0, 0, 3, 5, 6],
+    #               [0, 3, 9, 2, 0],
+    #               [2, 2, 8, 1, 1],
+    #               [7, 7, 0, 0, 0],
+    #               [3, 2, 6, 3, 0],
+    #               [2, 5, 3, 2, 2],
+    #               [6, 5, 2, 1, 0],
+    #               [0, 2, 2, 3, 7]])
+
+    # N: number examples, k = number classes
+    N, k = P.shape
+    # n: number of annotators
+    n = P.sum(axis=1)[0]
+    assert(np.all(P.sum(axis=1) == n))
+    # P_j..
+    pee_jays = np.sum(P, axis=0) / (N * n)
+    assert np.isclose(pee_jays.sum(), 1.), 'P_j calculation is wrong'
+
+    # P_is
+    pee_eye = np.sum(P * (P - 1), axis=1) / (n * (n - 1))
+
+    pee_tilde = pee_eye.mean()
+    pee_ee = np.sum(pee_jays ** 2)
+
+    # Fleiss' kappa
+    fleiss = (pee_tilde - pee_ee) / (1 - pee_ee)
+    return fleiss
+
+
 def computeOverlap3(df):
     Yourdf = pd.DataFrame(columns=df.columns, index=df.columns)
     Yourdf = Yourdf.stack(dropna=False).to_frame().apply(lambda x: (df[x.name[0]] == df[x.name[1]]).mean(),
@@ -130,6 +217,7 @@ def computeReviewerOverlap(df):
 
     print('Total overlap')
     print(computeOverlap(df))
+    print("Fleiss' kappa: %.2f" % computeFleiss(df))
 
     print('\nIncluded overlap')
     print(computeOverlap(filterDFForInclusion(df, 'Included')))
@@ -140,5 +228,11 @@ def computeReviewerOverlap(df):
 
 def selectPapersToReview(df, min_agreement=1):
     res = df[df['included_count'] >= min_agreement]
-    res.drop(['key', 'issn', 'volume', 'pages', 'issue', 'language', 'location', 'notes'], axis=1, inplace=True)
+    res.drop(DROP_FIELDS, axis=1, inplace=True)
+    return res
+
+
+def selectPapersToFilter(df, include_count, exclude_count):
+    res = df[(df['included_count'] == include_count) & (df['excluded_count'] == exclude_count)]
+    res.drop(DROP_FIELDS, axis=1, inplace=True)
     return res
